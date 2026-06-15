@@ -9,7 +9,7 @@ const comment =
 `/**
 * @name ${pkgJSON.name}
 * @version ${pkgJSON.version}
-* @copyright 2021
+* @copyright 2026
 * @author ${pkgJSON.author}
 * @license ${pkgJSON.license}
 */
