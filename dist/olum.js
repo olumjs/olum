@@ -1,6 +1,6 @@
 /**
  * @name Olum.js
- * @version 0.5.0
+ * @version 0.5.1
  * @copyright 2026
  * @author Eissa Saber
  * @license MIT
@@ -101,11 +101,11 @@ export default (function () {
     // user-supplied string (a todo title, a comment, anything) can't inject markup/scripts (XSS)
     // or visually break rendering when it contains <, >, &, or quotes.
     //   - null/undefined render as "" (instead of the literal text "null"/"undefined").
-    //   - To render trusted HTML on purpose, opt out explicitly with `olum.raw(html)` (below);
+    //   - To render trusted HTML on purpose, opt out explicitly with `olum.html(value)` (below);
     //     esc() detects the marker it returns and passes the HTML through unescaped.
     esc(value) {
       if (value === null || value === undefined) return "";
-      if (value && value.__olumRaw === true) return value.html; // explicit raw-HTML opt-in
+      if (value && value.__olumHtml === true) return value.html; // explicit raw-HTML opt-in
       return String(value)
         .replace(/&/g, "&amp;") // must run first so the entities below aren't double-escaped
         .replace(/</g, "&lt;")
@@ -114,10 +114,10 @@ export default (function () {
         .replace(/'/g, "&#39;");
     },
     // #2 opt-in escape hatch: mark a string as trusted raw HTML so `esc()` leaves it untouched.
-    // Usage in a template: {olum.raw(props.richText)}. Use it ONLY on HTML you control or have
+    // Usage in a template: {olum.html(props.richText)}. Use it ONLY on HTML you control or have
     // already sanitized — this is the deliberate, greppable way to bypass auto-escaping.
-    raw(html) {
-      return { __olumRaw: true, html: html == null ? "" : String(html) };
+    html(value) {
+      return { __olumHtml: true, html: value == null ? "" : String(value) };
     },
     eventsHandler(el, nodes, compName, methodsRefObj) {
       function event(item, str, modifiers) {
