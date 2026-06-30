@@ -379,6 +379,27 @@ export default (function () {
     }
 
     use(comp) {
+      if (comp) {
+        const isRouter = typeof comp?.name === "function" && comp.name() === "Router";
+        const isComponent = typeof comp?.name == "string" && comp.name === "default";
+        if (isRouter) {
+          this.useRouter(comp);
+        } else if (isComponent) {
+          this.useComponent(comp)
+        } else {
+          throw new Error("Can't mount, Missing component or router @use()");
+        }
+      }
+    }
+
+    useRouter(router) {
+      // share props/methods with router
+      router.__proto__.rootElm = this.root;
+      router.render = (view) => this.useComponent(view);
+      if (router.isReady) router.listen();
+    }
+
+    useComponent(comp) {
       const entry = comp();
       const { store, rootKey } = this.share(entry);
       const tree = window.olum.buildTree(entry, store, rootKey);
@@ -386,6 +407,7 @@ export default (function () {
 
       this.setupListeners(store); // unmounted hook & state system
 
+      this.root.innerHTML = ""; // clear any previously mounted view (router navigation)
       this.root.append(tree); // bind full comps tree
       // handle mounted hook
       if (entry.hooks.mounted) entry.hooks.mounted(); // force mounting parent component (entry point comp) regardless of the data-o-if value
