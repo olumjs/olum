@@ -546,7 +546,7 @@ export default (function () {
               // was mounted, now removed from DOM → unMounted
               if (c.hooks.unMounted && !c.hooks.isUnMounted) {
                 const onTeardown = c.hooks.unMounted;
-                if (onTeardown) onTeardown();
+                if (onTeardown && typeof onTeardown === "function") onTeardown();
                 c.hooks.isUnMounted = true;
                 c.hooks.isMounted = false;
               }
