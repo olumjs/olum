@@ -1,6 +1,6 @@
 /**
  * @name Olum.js
- * @version 0.5.1
+ * @version 0.5.4
  * @copyright 2026
  * @author Eissa Saber
  * @license MIT
@@ -410,7 +410,11 @@ export default (function () {
       this.root.innerHTML = ""; // clear any previously mounted view (router navigation)
       this.root.append(tree); // bind full comps tree
       // handle mounted hook
-      if (entry.hooks.mounted) entry.hooks.mounted(); // force mounting parent component (entry point comp) regardless of the data-o-if value
+      if (entry.hooks.mounted) {
+        const onMount = entry.hooks.mounted; // force mounting parent component (entry point comp) regardless of the data-o-if value
+        const onTeardown = onMount();
+        entry.hooks.unMounted = onTeardown;
+      }
       entry.hooks.isMounted = true;
       // mount every instance created during buildTree (keyed by runtime instance key)
       Object.keys(store).forEach((key) => {
@@ -422,7 +426,11 @@ export default (function () {
           // don't render comp because it has falsy value
         } else {
           if (["olum-no-condition", "true"].includes(ifConValue)) {
-            if (c.hooks.mounted) c.hooks.mounted();
+            if (c.hooks.mounted) {
+              const onMount = c.hooks.mounted;
+              const onTeardown = onMount();
+              c.hooks.unMounted = onTeardown;
+            }
             c.hooks.isMounted = true;
           }
         }
@@ -537,14 +545,17 @@ export default (function () {
             if (prevMounted[name] && !isInDOM) {
               // was mounted, now removed from DOM → unMounted
               if (c.hooks.unMounted && !c.hooks.isUnMounted) {
-                c.hooks.unMounted();
+                const onTeardown = c.hooks.unMounted;
+                if (onTeardown) onTeardown();
                 c.hooks.isUnMounted = true;
                 c.hooks.isMounted = false;
               }
             } else if (!prevMounted[name] && isInDOM) {
               // was not mounted, now in DOM → mounted
               if (c.hooks.mounted && !c.hooks.isMounted) {
-                c.hooks.mounted();
+                const onMount = c.hooks.mounted;
+                const onTeardown = onMount();
+                c.hooks.unMounted = onTeardown;
                 c.hooks.isMounted = true;
                 c.hooks.isUnMounted = false;
               }
@@ -567,3 +578,5 @@ export default (function () {
 
   return Olum;
 })();
+
+export const onMount = (cb) => cb
