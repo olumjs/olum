@@ -1,6 +1,6 @@
 /**
  * @name Olum.js
- * @version 0.5.5
+ * @version 0.5.9
  * @copyright 2026
  * @author Eissa Saber
  * @license MIT
@@ -241,6 +241,35 @@ export default (function () {
     isFullObj(obj) {
       return !!(this.isObj(obj) && Array.isArray(Object.keys(obj)) && Object.keys(obj).length);
     },
+    // returns a per-instance props proxy bound to a runtime store key. Reads resolve the instance's
+    // incoming props live from the store; writes chain up to whoever owns the value: a `state` source
+    // writes the parent's state (triggering re-render), a `props` source recurses up the parent's own
+    // props proxy until it reaches the state owner. Backs the compiled `props()` accessor.
+    props(storeKey) {
+      return new Proxy({}, {
+        get(_, key) {
+          const entry = window.olum.app.store[storeKey];
+          if (!entry) return undefined;
+          // slot content lives on the store entry (set in buildTree), not in incomingProps — expose it as props().children
+          if (key === "children") return entry.children || "";
+          return entry.incomingProps ? entry.incomingProps[key] : undefined;
+        },
+        set(_, key, val) {
+          const entry = window.olum.app.store[storeKey];
+          if (entry && entry.parentCompName && entry.incomingPropSources) {
+            const desc = entry.incomingPropSources[key];
+            if (desc) {
+              const parent = window.olum.app.store[entry.parentCompName];
+              if (parent) {
+                if (desc.kind === "state" && parent.stateProps) parent.stateProps[desc.key] = val;
+                else if (desc.kind === "props" && parent.incomingPropsProxy) parent.incomingPropsProxy[desc.key] = val;
+              }
+            }
+          }
+          return true;
+        },
+      });
+    },
     createStore(entry) {
       const store = {};
       const map = [];
@@ -308,30 +337,39 @@ export default (function () {
             instanceKey = containerKey + ">" + name + "#" + occ[name];
           }
 
-          // reuse the instance from a previous render (preserves its state) or mint a fresh one
-          let child = store[instanceKey];
-          if (!child) {
-            child = factory(instanceKey);
-            store[instanceKey] = child;
-          }
-
-          // handle props
-          child.parentCompName = containerKey;
+          // compute this render's incoming props from the placeholder (re-read every pass so
+          // re-renders pick up fresh parent values)
           const propsJson = placeholder.getAttribute("data-o-props");
-          child.incomingProps = propsJson ? JSON.parse(decodeURIComponent(propsJson)) : {};
+          const incomingProps = propsJson ? JSON.parse(decodeURIComponent(propsJson)) : {};
+          const incomingPropSources = {};
           const srcStr = placeholder.getAttribute("data-o-props-src") || "";
-          child.incomingPropSources = {};
           if (srcStr)
             srcStr.split("|").forEach((pair) => {
               const parts = pair.split(":"); // propKey:kind:srcKey
               const propKey = parts[0],
                 kind = parts[1],
                 srcKey = parts[2];
-              if (propKey && kind && srcKey) child.incomingPropSources[propKey] = { kind, key: srcKey };
+              if (propKey && kind && srcKey) incomingPropSources[propKey] = { kind, key: srcKey };
             });
+          // slot/children — must be set before getElm so ${children} resolves in the child's template
+          const childrenHtml = placeholder.innerHTML.trim();
 
-          // handle slot/children — must be set before getElm so ${children} resolves in the child's template
-          child.children = placeholder.innerHTML.trim();
+          // reuse the instance from a previous render (preserves its state) or mint a fresh one
+          let child = store[instanceKey];
+          if (!child) {
+            // pre-seed the store slot with prop data BEFORE running the factory, so the component's
+            // TOP-LEVEL props() (not just props() inside onMount) resolves during factory execution.
+            store[instanceKey] = { parentCompName: containerKey, incomingProps, incomingPropSources, children: childrenHtml };
+            const created = factory(instanceKey);
+            Object.assign(store[instanceKey], created); // merge el/__OLUM__/hooks/incomingPropsProxy/stateProps
+            child = store[instanceKey];
+          } else {
+            // existing instance (re-render): refresh props/children, keep its state
+            child.parentCompName = containerKey;
+            child.incomingProps = incomingProps;
+            child.incomingPropSources = incomingPropSources;
+            child.children = childrenHtml;
+          }
 
           const elm = child.__OLUM__.getElm;
           if (elm) {
@@ -580,3 +618,7 @@ export default (function () {
 })();
 
 export const onMount = (cb) => cb
+export const params = (path, pathname) => extractParams(path, pathname);
+// per-instance props accessor. The compiler binds each `props()` call to this component's runtime
+// store key: `props()` -> `props(_storeKey)`. Delegates to the olum runtime proxy factory above.
+export const props = (storeKey) => window.olum.props(storeKey);
