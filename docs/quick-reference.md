@@ -40,6 +40,14 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <Card title="Hi" count="{n + 1}" data="{state.obj}">
   <span>slot content → {children}</span>
 </Card>
+
+<!-- PROPS (in the child's <script>) -->
+const { title, children } = props();  // INITIAL snapshot, no onMount needed
+{props().title}                       // LATEST value, call anywhere (template or method)
+{props().children}                    // LATEST slot content
+
+<!-- host: this component's root element, inside onMount -->
+onMount(() => { host.querySelector("main"); });
 ```
 
 :::tip[The design principle]

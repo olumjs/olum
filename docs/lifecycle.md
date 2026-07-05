@@ -21,3 +21,17 @@ Import `onMount` from `olum` and call it with a callback. The callback runs when
 
 - The `onMount` callback runs when the component is inserted into the DOM.
 - The **returned cleanup function** runs when it's removed (e.g. an `<if>` toggles it off, or a keyed list item is removed).
+
+## `host`
+
+Inside `onMount`, `host` refers to this component's own root DOM element — no import needed. Use it to query within the component instead of `document.querySelector`, which could match another instance or an unrelated element elsewhere on the page.
+
+```html title="Component.html"
+<script>
+  import { onMount } from "olum";
+
+  onMount(() => {
+    const main = host.querySelector("main");
+  });
+</script>
+```

@@ -23,6 +23,6 @@ A component is one `.html` file with up to three parts: `<script>` (logic), `<st
 </div>
 ```
 
-- `state`, methods, and `props` declared in `<script>` are directly available in the template (same closure).
+- `state`, methods, and any consts destructured from [`props()`](/docs/components) are directly available in the template (same closure).
 - `<style>` is automatically **scoped** to the component (the compiler tags the component's elements with a unique attribute).
 - Component **tag names are PascalCase** — that's how the compiler tells a component apart from a normal element.
