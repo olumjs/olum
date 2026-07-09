@@ -1,6 +1,6 @@
 /**
  * @name Olum.js
- * @version 0.5.9
+ * @version 0.6.0
  * @copyright 2026
  * @author Eissa Saber
  * @license MIT
@@ -351,6 +351,21 @@ export default (function () {
                 srcKey = parts[2];
               if (propKey && kind && srcKey) incomingPropSources[propKey] = { kind, key: srcKey };
             });
+          // FUNCTION PROPS: functions can't cross the JSON data-o-props channel, so they're
+          // resolved live from the parent instance on every render pass.
+          //   kind "method" — toggle="{toggle}" names a parent top-level function -> methodsRef
+          //   kind "props"  — toggle="{props().toggle}" forwards a prop; if JSON dropped it
+          //                   (it was a function), pull it from the parent's own incoming props
+          Object.keys(incomingPropSources).forEach((propKey) => {
+            const desc = incomingPropSources[propKey];
+            if (desc.kind === "method") {
+              const fn = containerComp.methodsRef && containerComp.methodsRef[desc.key];
+              if (typeof fn === "function") incomingProps[propKey] = fn;
+            } else if (desc.kind === "props" && incomingProps[propKey] === undefined) {
+              const val = containerComp.incomingProps && containerComp.incomingProps[desc.key];
+              if (typeof val === "function") incomingProps[propKey] = val;
+            }
+          });
           // slot/children — must be set before getElm so ${children} resolves in the child's template
           const childrenHtml = placeholder.innerHTML.trim();
 
