@@ -7,7 +7,8 @@
     "dist": "dist"
   },
   "scripts": {
-    "build": "gulp"
+    "build": "gulp",
+    "test": "node ./tests/olum.test.js"
   },
   "repository": {
     "type": "git",
@@ -33,6 +34,7 @@
     "gulp-babel": "^8.0.0",
     "gulp-concat": "^2.6.1",
     "gulp-header": "^2.0.9",
-    "gulp-uglify": "^3.0.2"
+    "gulp-uglify": "^3.0.2",
+    "jsdom": "^19.0.0"
   }
 }
