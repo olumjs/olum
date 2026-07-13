@@ -35,6 +35,8 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <for each="item of state.items" key="item.id"><Row item="{item}" /></for>
 <for each="i of 6">{i}</for>
 <for each="key in state.map">{key}</for>
+<for each="(item, index, arr) of state.items">{index}: {item}</for>
+<for each="(key, index, value) in state.map">{key} = {value}</for>
 
 <!-- COMPONENTS + PROPS + SLOT -->
 <Card title="Hi" count="{n + 1}" data="{state.obj}">

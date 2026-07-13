@@ -20,3 +20,5 @@ OlumJS intentionally has **no naked braces** and **one way** to do each thing. T
 | `mode="prevent"` | e.preventDefault() in the handler | no modifiers |
 | literal `{` in text | `{String.fromCharCode(123)}` | any `{…}` is interpolated |
 | `<comp/>` | `<Comp/>` | components are PascalCase |
+| `state.user.name = "Bo"` | `state.user = { ...state.user, name: "Bo" }` | reactivity is [one level deep](/docs/state) |
+| `state.todos.push(t)` | `state.todos = [...state.todos, t]` | in-place mutation isn't tracked |

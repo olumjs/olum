@@ -35,11 +35,30 @@ When a component has `state` and it changes, Olum rebuilds that **entire target 
 <button onclick="inc()">{state.count}</button>
 ```
 
-## 2. No integrated unit testing
+## 2. Reactive state is one level deep
+
+`state` is wrapped in a shallow proxy: only assignments to its **top-level keys** are detected. Mutating nested data in place — `state.user.name = "Bo"`, `state.todos.push(t)`, `state.todos[0].done = true` — updates the object but triggers **no re-render and no watcher**.
+
+**Avoid it by design:** treat nested data as immutable and assign a **fresh value** to the top-level key:
+
+```js
+// ✗ silent — the proxy never sees these
+state.user.name = "Bo";
+state.todos.push(todo);
+
+// ✓ top-level assignment with a new reference
+state.user = { ...state.user, name: "Bo" };
+state.todos = [...state.todos, todo];
+state.todos = state.todos.map(t => t.id === id ? { ...t, done: true } : t);
+```
+
+Note that re-assigning the **same reference** (`state.todos = state.todos`) is also skipped as a no-op — the new value must be a different reference. See [State & Reactivity](/docs/state).
+
+## 3. No integrated unit testing
 
 There is no testing framework wired into OlumJS yet — no built-in test runner or component testing utilities. You can still test plain JS logic with any external tool, but there's no first-class story for testing components at the moment.
 
-## 3. Global store ergonomics
+## 4. Global store ergonomics
 
 There is already a **global store across the whole application**, together with the [scope system](/docs/scope) (private/public attributes on the `<script>` tag) for exposing props/methods. It's a little awkward in practice, though: a registered component's name isn't straightforward, so you reach it through its location key — e.g. `olum.app.store["page>App#0"]`.
 

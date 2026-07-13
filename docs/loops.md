@@ -23,6 +23,30 @@ order: 80
 </for>
 ```
 
+## Index and array — `(item, index, arr)`
+
+Wrap the loop params in parentheses to also receive the **index** (0-based) and the **array itself** — same signature as `Array.prototype.map`:
+
+```html title="Component.html"
+<for each="(cat, index, arr) of state.cats">
+  <li>{index + 1}/{arr.length}: {cat.name}</li>
+</for>
+```
+
+Extra params are optional — `(cat, index)` works too.
+
+The `in` (object) form takes `(key, index, value)`, where `value` is a shortcut for `obj[key]`:
+
+```html title="Component.html"
+<for each="(key, index, value) in state.settings">
+  <div>{index}. {key} = {value}</div>
+</for>
+```
+
+:::note
+In the numeric-range form (`i of 6`) only the first param is meaningful — `i` already counts 1 → N.
+:::
+
 ## Keyed loops — `key`
 
 When the loop body contains a **component**, add `key` so each instance is reused by identity across reorders/insertions/removals instead of by position:
