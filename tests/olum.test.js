@@ -448,6 +448,18 @@ check("substitutes $event with the real event object", () => {
   return received && received.type === "input";
 });
 
+// a <for>-scoped handler serializes the loop variable's per-item VALUE into the args
+// (compiler emits JSON.stringify(['$event', flavour])) — the runtime must pass it
+// back alongside the substituted event object
+check("extra serialized args (loop variables) are passed after $event", () => {
+  let received;
+  const { el, window } = wireEvent("input", 'onchange|toggle=["$event","Mint choc chip"]', {
+    toggle: (e, flavour) => (received = { type: e.type, flavour }),
+  });
+  el.dispatchEvent(new window.Event("change"));
+  return received && received.type === "change" && received.flavour === "Mint choc chip";
+});
+
 check("a no-arg handler still receives the event", () => {
   let received;
   const { el, window } = wireEvent("button", "onclick|inc=[]", { inc: (e) => (received = e) });
@@ -582,7 +594,7 @@ if (failed) {
 }
 
 // Guard against a whole section silently disappearing. Bump when you add/remove tests.
-const EXPECTED_CHECKS = 51;
+const EXPECTED_CHECKS = 52;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");
