@@ -38,7 +38,7 @@ const FAIL_ICON = red("✖");
 // Build a fresh jsdom + a freshly-evaluated copy of core/olum.js. `export default`
 // (the Olum class) and the `export const` accessors are rewritten to plain locals
 // and handed back so tests can reach both the class and the `window.olum` singleton.
-const OLUM_SRC = fs.readFileSync(path.join(__dirname, "../src/olum.js"), "utf8");
+const OLUM_SRC = fs.readFileSync(path.join(__dirname, "../core/olum.js"), "utf8");
 function load() {
   const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", { url: "http://localhost/" });
   // The module reads bare `window`/`document`/`CustomEvent`; point the node globals
