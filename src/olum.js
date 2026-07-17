@@ -1,6 +1,6 @@
 /**
  * @name Olum.js
- * @version 0.6.0
+ * @version 0.7.2
  * @copyright 2026
  * @author Eissa Saber
  * @license MIT
@@ -599,18 +599,18 @@ export default (function () {
               // was mounted, now removed from DOM → unMounted
               if (c.hooks.unMounted && !c.hooks.isUnMounted) {
                 const onTeardown = c.hooks.unMounted;
-                if (onTeardown && typeof onTeardown === "function") onTeardown();
                 c.hooks.isUnMounted = true;
                 c.hooks.isMounted = false;
+                if (onTeardown && typeof onTeardown === "function") onTeardown();
               }
             } else if (!prevMounted[name] && isInDOM) {
               // was not mounted, now in DOM → mounted
               if (c.hooks.mounted && !c.hooks.isMounted) {
                 const onMount = c.hooks.mounted;
-                const onTeardown = onMount();
-                c.hooks.unMounted = onTeardown;
                 c.hooks.isMounted = true;
                 c.hooks.isUnMounted = false;
+                const onTeardown = onMount();
+                c.hooks.unMounted = onTeardown;
               }
             }
           });
@@ -637,3 +637,10 @@ export const params = (path, pathname) => extractParams(path, pathname);
 // per-instance props accessor. The compiler binds each `props()` call to this component's runtime
 // store key: `props()` -> `props(_storeKey)`. Delegates to the olum runtime proxy factory above.
 export const props = (storeKey) => window.olum.props(storeKey);
+export const store = (key) => { // get the correct component store by name instead of memorizing the location of component
+  const componentsNames = ["page", ...Object.keys(window.olum.app.registry)];
+  const index = componentsNames.indexOf(key);
+  const storeKeys = Object.keys(window.olum.app.store); 
+  const realKey = storeKeys[index];
+  return window.olum.app.store[realKey];
+}
