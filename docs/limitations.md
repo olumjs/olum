@@ -54,11 +54,74 @@ state.todos = state.todos.map(t => t.id === id ? { ...t, done: true } : t);
 
 Note that re-assigning the **same reference** (`state.todos = state.todos`) is also skipped as a no-op — the new value must be a different reference. See [State & Reactivity](/docs/state).
 
-## 3. No integrated unit testing
+## 3. No element refs, actions, or transitions
+
+There is no `bind:this`, no `use:action` directive, and no transition/animation system. The workaround for all three is the same: do it imperatively in [`onMount`](/docs/lifecycle), using `host` to reach this component's own elements, and return a cleanup:
+
+```html title="Component.html"
+<script>
+  import { onMount } from "olum";
+  import { longpress } from "./longpress.js";
+
+  onMount(() => {
+    const button = host.querySelector("button");   // "ref" via host
+    const action = longpress(button, 2000);        // "action" wired by hand
+    return () => action.destroy();                 // cleanup on unmount
+  });
+</script>
+
+<button>press and hold</button>
+```
+
+Since a re-render rebuilds the component (limitation #1), `onMount` re-runs afterwards and re-attaches the behavior with the current state — an action's `update()` hook usually isn't needed.
+
+## 4. No special elements (`window` / `document` / `body`)
+
+There is no `<olum:window>`-style element for global listeners. Attach them in `onMount` and remove them in the cleanup:
+
+```html title="Component.html"
+<script>
+  import { onMount } from "olum";
+
+  const state = { keys: [] };
+  const handleKeydown = (e) => (state.keys = [...state.keys, e.key].slice(-8));
+
+  onMount(() => {
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  });
+</script>
+```
+
+The same pattern covers `document` events (`selectionchange`, …).
+
+## 5. No dynamic component element
+
+There is no `<component is="…">` equivalent. Switch over the known component set with an `if` / `else-if` chain driven by a plain string in state:
+
+```html title="Component.html"
+<script>
+  import RedThing from "./RedThing";
+  import GreenThing from "./GreenThing";
+  import BlueThing from "./BlueThing";
+
+  const state = { color: "red" };
+</script>
+
+<if when="state.color === 'red'"><RedThing /></if>
+<else-if when="state.color === 'green'"><GreenThing /></else-if>
+<else><BlueThing /></else>
+```
+
+## 6. No dimension bindings
+
+There is no built-in binding for an element's `clientWidth` / `clientHeight` (e.g. for responsive SVG charts). Use fixed dimensions, or set up a `ResizeObserver` yourself in `onMount` and write the measurements into `state`.
+
+## 7. No integrated unit testing
 
 There is no testing framework wired into OlumJS yet — no built-in test runner or component testing utilities. You can still test plain JS logic with any external tool, but there's no first-class story for testing components at the moment.
 
-## 4. Global store ergonomics
+## 8. Global store ergonomics
 
 There is already a **global store across the whole application**, together with the [scope system](/docs/scope) (private/public attributes on the `<script>` tag) for exposing props/methods. It's a little awkward in practice, though: a registered component's name isn't straightforward, so you reach it through its location key — e.g. `olum.app.store["page>App#0"]`.
 

@@ -25,3 +25,20 @@ Destructuring takes a one-time **snapshot**. To always render the **latest** slo
 ```html title="CounterCard.html"
 <div class="slot">{props().children}</div>
 ```
+
+## Fallback content
+
+`props().children` is empty when the parent passed nothing between the tags — render a fallback with `<if>` / `<else>`:
+
+```html title="Box.html"
+<!-- Box.html -->
+<div class="box">
+  <if when="props().children">{props().children}</if>
+  <else><em>no content was provided</em></else>
+</div>
+```
+
+```html title="Parent.html"
+<Box><p>This is a box.</p></Box>   <!-- renders the slot content -->
+<Box />                            <!-- renders the fallback -->
+```

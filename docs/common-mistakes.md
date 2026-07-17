@@ -20,5 +20,9 @@ OlumJS intentionally has **no naked braces** and **one way** to do each thing. T
 | `mode="prevent"` | e.preventDefault() in the handler | no modifiers |
 | literal `{` in text | `{String.fromCharCode(123)}` | any `{…}` is interpolated |
 | `<comp/>` | `<Comp/>` | components are PascalCase |
+| `<Comp {...obj} />` | `<Comp a="{obj.a}" b="{obj.b}" />` | no spread props — pass each field |
+| `<select value="{x}">` | `selected="{x === …}"` on each `<option>` | `value` on `<select>` silently does nothing |
+| `bind:this` / element refs | `host.querySelector(…)` in `onMount` | no refs — query within [`host`](/docs/lifecycle) |
+| `use:action` | wire up manually in `onMount`, clean up in its return | no action directive ([limitations](/docs/limitations)) |
 | `state.user.name = "Bo"` | `state.user = { ...state.user, name: "Bo" }` | reactivity is [one level deep](/docs/state) |
 | `state.todos.push(t)` | `state.todos = [...state.todos, t]` | in-place mutation isn't tracked |

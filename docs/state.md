@@ -22,6 +22,22 @@ Declare reactive state as `const state = { ... }`. **Assigning to a top-level `s
 Only `state` is reactive. Plain `const` / `let` variables are not tracked.
 :::
 
+## Derived values are plain functions
+
+There is no separate "computed" concept — a derived value is just a **function** you call in the template. Every re-render re-evaluates it, so it always reflects the current state. Derived functions can call each other:
+
+```html title="Component.html"
+<script>
+  const state = { count: 1 };
+
+  const doubled = () => state.count * 2;      // derived from state
+  const quadrupled = () => doubled() * 2;     // derived from another derived
+</script>
+
+<p>{state.count} * 2 = {doubled()}</p>
+<p>{doubled()} * 2 = {quadrupled()}</p>
+```
+
 ## Reactivity is one level deep
 
 Only assignments to **top-level keys** of `state` are tracked. Mutating a nested object or calling an array method in place changes the data but does **not** re-render:

@@ -21,7 +21,17 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <!-- EVENTS (code in "") -->
 <button onclick="save()">Save</button>
 <input oninput="(e)=> state.text = e.target.value" />
+<input oninput="setValue($event)" />
 <form onsubmit="(e)=> { e.preventDefault(); submit() }"></form>
+
+<!-- FORM BINDINGS (manual two-way) -->
+<input value="{state.text}" oninput="(e)=> state.text = e.target.value" />
+<input type="number" value="{state.n}" oninput="(e)=> state.n = +e.target.value" />
+<input type="checkbox" checked="{state.on}" onchange="(e)=> state.on = e.target.checked" />
+<input type="radio" checked="{state.pick === 'a'}" onchange="state.pick = 'a'" />
+<select onchange="(e)=> state.color = e.target.value">
+  <option value="red" selected="{state.color === 'red'}">red</option>  <!-- selected on option, NOT value on select -->
+</select>
 
 <!-- CONDITIONALS -->
 <if when="state.tab === 'a'">…</if>
@@ -45,8 +55,16 @@ A condensed cheat-sheet covering all template syntax at a glance.
 
 <!-- PROPS (in the child's <script>) -->
 const { title, children } = props();  // INITIAL snapshot, no onMount needed
+const { size = "md" } = props();      // default value when the parent omits it
 {props().title}                       // LATEST value, call anywhere (template or method)
 {props().children}                    // LATEST slot content
+
+<!-- FUNCTION PROPS (component events) -->
+<Inner onMessage="{handleMessage}" />  <!-- child calls: props().onMessage(payload) -->
+
+<!-- DERIVED VALUES (plain functions) -->
+const doubled = () => state.count * 2;
+{doubled()}
 
 <!-- host: this component's root element, inside onMount -->
 onMount(() => { host.querySelector("main"); });
