@@ -60,3 +60,15 @@ When the loop body contains a **component**, add `key` so each instance is reuse
 :::note
 `key` only matters for **component** loops. On a loop of plain elements there is no per-item instance to preserve, so `key` is a harmless no-op.
 :::
+
+## The numeric range needs a literal number
+
+`each="i of 6"` compiles to a range **only when the count is written as a literal number**. A dynamic count isn't detected — build the range from it instead:
+
+```html title="Component.html"
+<!-- ✗ breaks at runtime: state.n is a number, not an array -->
+<for each="i of state.n">…</for>
+
+<!-- ✓ range built from the dynamic count (i goes 1 → n) -->
+<for each="i of Array.from({ length: state.n }, (_, k) => k + 1)">…</for>
+```

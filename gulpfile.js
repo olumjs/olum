@@ -9,7 +9,7 @@ const comment =
 `/**
 * @name ${pkgJSON.name}
 * @version ${pkgJSON.version}
-* @copyright 2026
+* @copyright ${new Date().getFullYear()} 
 * @author ${pkgJSON.author}
 * @license ${pkgJSON.license}
 */
@@ -24,6 +24,6 @@ gulp.task("compile", () => {
     .pipe(header(comment))
     .pipe(gulp.dest("dist"));
 });
-gulp.task("copy", () => gulp.src("./src/olum.js").pipe(gulp.dest("dist")));
+gulp.task("copy", () => gulp.src("./src/olum.js").pipe(header(comment)).pipe(gulp.dest("dist")));
 
 gulp.task("default", gulp.series(["compile", "copy"]));

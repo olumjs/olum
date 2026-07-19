@@ -1,10 +1,10 @@
 /**
- * @name Olum.js
- * @version 0.7.2
- * @copyright 2026
- * @author Eissa Saber
- * @license MIT
- */
+* @name olum
+* @version 0.8.0
+* @copyright 2026 
+* @author Eissa Saber
+* @license MIT
+*/
 export default (function () {
   var olum = {
     app: {}, // this is a must to access live changes
@@ -13,6 +13,18 @@ export default (function () {
     },
     dispatchEvent(event, data) {
       window.dispatchEvent(new CustomEvent(event, { detail: data }));
+    },
+    mkHash(str) {
+      var hash = 0;
+      var i;
+      var char;
+      if (str.length === 0) return hash;
+      for (i = 0; i < str.length; i++) {
+        char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash |= 0; // Convert to 32bit integer
+      }
+      return hash;
     },
     mkElm(type, compName, compId) {
       const el = document.createElement(type);
@@ -29,51 +41,91 @@ export default (function () {
       document.head.appendChild(tag);
     },
     proxyHandler(obj, watcher, el) {
-      function mkHash(str) {
-        var hash = 0;
-        var i;
-        var char;
-        if (str.length === 0) return hash;
-        for (i = 0; i < str.length; i++) {
-          char = str.charCodeAt(i);
-          hash = (hash << 5) - hash + char;
-          hash |= 0; // Convert to 32bit integer
-        }
-        return hash;
+      const mkHash = olum.mkHash;
+      const proxies = new WeakMap(); // raw object -> proxy: wrap each object once so identity stays stable
+      const raws = new WeakMap(); // proxy -> raw object: unwrap values assigned back into state
+
+      function emit() {
+        // todo prefix compName with instance e.g. you may have one component used twice so compName-1 & compName-2
+        const dataObj = { compName: obj.__olum__.compName, compId: obj.__olum__.compId };
+        dataObj.hash = mkHash(dataObj.compName + dataObj.compId);
+        window.olum.$emit("updateOlumComp", dataObj);
       }
+
+      const nestedHandler = {
+        get: function (t, key) {
+          return wrap(t[key]);
+        },
+        set: function (t, key, val) {
+          val = raws.get(val) || val;
+          if (t[key] === val) return true;
+          t[key] = val;
+          emit();
+          return true;
+        },
+        deleteProperty: function (t, key) {
+          if (!(key in t)) return true;
+          delete t[key];
+          emit();
+          return true;
+        },
+      };
+
+      // Map/Set methods read internal slots, which proxies can't forward — so every method is
+      // rebound to run against the raw collection: mutators emit, Map.get results are wrapped.
+      const collectionMutators = ["set", "add", "delete", "clear"];
+      const collectionHandler = {
+        get: function (coll, key) {
+          const val = coll[key];
+          if (typeof val !== "function") return val; // e.g. size
+          return function (...args) {
+            const result = val.apply(coll, args.map((a) => raws.get(a) || a));
+            if (collectionMutators.includes(key)) emit();
+            return key === "get" ? wrap(result) : result;
+          };
+        },
+      };
+
+      function wrap(val) {
+        if (val === null || typeof val !== "object") return val;
+        const isCollection = val instanceof Map || val instanceof Set;
+        if (!isCollection && !Array.isArray(val)) {
+          const proto = Object.getPrototypeOf(val);
+          if (proto !== Object.prototype && proto !== null) return val;
+        }
+        let p = proxies.get(val);
+        if (!p) {
+          p = new Proxy(val, isCollection ? collectionHandler : nestedHandler);
+          proxies.set(val, p);
+          raws.set(p, val);
+        }
+        return p;
+      }
+
       var handler = {
         get: function (obj, key) {
-          return obj[key];
+          return key === "__olum__" ? obj[key] : wrap(obj[key]);
         },
         set: function (obj, key, newVal) {
           if (key === "__olum__") return false;
+          newVal = raws.get(newVal) || newVal;
           const oldVal = obj[key];
           if (oldVal === newVal) return true;
           obj[key] = newVal;
           if (watcher && watcher[key] && typeof watcher[key] === "function") watcher[key](oldVal, newVal);
-          // todo prefix compName with instance e.g. you may have one component used twice so compName-1 & compName-2
-          const dataObj = { compName: obj.__olum__.compName, compId: obj.__olum__.compId };
-          const hash = mkHash(dataObj.compName + dataObj.compId);
-          dataObj.hash = hash;
-
-          window.olum.$emit("updateOlumComp", dataObj);
+          emit();
           return true;
         },
         deleteProperty: function (obj, key) {
           if (key === "__olum__") return false;
           delete obj[key];
-          // todo prefix compName with instance e.g. you may have one component used twice so compName-1 & compName-2
-          const dataObj = { compName: obj.__olum__.compName, compId: obj.__olum__.compId };
-          const hash = mkHash(dataObj.compName + dataObj.compId);
-          dataObj.hash = hash;
-
-          window.olum.$emit("updateOlumComp", dataObj);
+          emit();
           return true;
         },
       };
       return new Proxy(obj, handler);
     },
-    proxyHandlerForStore(obj, originalProxy) {
+    proxyHandlerForScope(obj, originalProxy) {
       const handler = {
         get: function (obj, key) {
           return originalProxy[key];
@@ -96,13 +148,6 @@ export default (function () {
       if (str === "null") return null;
       return str;
     },
-    // #2 (escape-by-default): HTML-escape a value before it is interpolated into a template.
-    // The compiler wraps every text/attribute interpolation `{expr}` in `olum.esc(expr)` so a
-    // user-supplied string (a todo title, a comment, anything) can't inject markup/scripts (XSS)
-    // or visually break rendering when it contains <, >, &, or quotes.
-    //   - null/undefined render as "" (instead of the literal text "null"/"undefined").
-    //   - To render trusted HTML on purpose, opt out explicitly with `olum.html(value)` (below);
-    //     esc() detects the marker it returns and passes the HTML through unescaped.
     esc(value) {
       if (value === null || value === undefined) return "";
       if (value && value.__olumHtml === true) return value.html; // explicit raw-HTML opt-in
@@ -113,9 +158,6 @@ export default (function () {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
     },
-    // #2 opt-in escape hatch: mark a string as trusted raw HTML so `esc()` leaves it untouched.
-    // Usage in a template: {olum.html(props.richText)}. Use it ONLY on HTML you control or have
-    // already sanitized — this is the deliberate, greppable way to bypass auto-escaping.
     html(value) {
       return { __olumHtml: true, html: value == null ? "" : String(value) };
     },
@@ -241,10 +283,6 @@ export default (function () {
     isFullObj(obj) {
       return !!(this.isObj(obj) && Array.isArray(Object.keys(obj)) && Object.keys(obj).length);
     },
-    // returns a per-instance props proxy bound to a runtime store key. Reads resolve the instance's
-    // incoming props live from the store; writes chain up to whoever owns the value: a `state` source
-    // writes the parent's state (triggering re-render), a `props` source recurses up the parent's own
-    // props proxy until it reaches the state owner. Backs the compiled `props()` accessor.
     props(storeKey) {
       return new Proxy({}, {
         get(_, key) {
@@ -254,49 +292,12 @@ export default (function () {
           if (key === "children") return entry.children || "";
           return entry.incomingProps ? entry.incomingProps[key] : undefined;
         },
-        set(_, key, val) {
-          const entry = window.olum.app.store[storeKey];
-          if (entry && entry.parentCompName && entry.incomingPropSources) {
-            const desc = entry.incomingPropSources[key];
-            if (desc) {
-              const parent = window.olum.app.store[entry.parentCompName];
-              if (parent) {
-                if (desc.kind === "state" && parent.stateProps) parent.stateProps[desc.key] = val;
-                else if (desc.kind === "props" && parent.incomingPropsProxy) parent.incomingPropsProxy[desc.key] = val;
-              }
-            }
-          }
+        set(_, key) {
+          console.warn('olum: props are read-only — "' + String(key) + '" was not written. Pass a callback prop to update the parent, or share the value via the global store.');
           return true;
         },
       });
     },
-    createStore(entry) {
-      const store = {};
-      const map = [];
-      store[entry.__OLUM__.compName] = entry; // bind root component
-
-      // bind children components
-      const recursive = (comp) => {
-        if (this.isFullArr(comp.__OLUM__.components)) {
-          comp.__OLUM__.components.forEach((item) => {
-            var key = Object.keys(item)[0];
-            var newComp = item[key]();
-            if (!store[key]) store[key] = newComp;
-
-            const obj = { name: key, children: newComp.__OLUM__.components.map((obj) => Object.keys(obj)[0]) };
-            map.push(obj);
-
-            if (this.isFullArr(obj.children)) recursive(newComp);
-          });
-        }
-      };
-      recursive(entry);
-
-      return { store, map };
-    },
-
-    // direct <olum> placeholders of a container: those with no <olum> ancestor inside the container.
-    // (deeper placeholders belong to a nested component and are handled when that component renders)
     directOlums(container) {
       return Array.prototype.slice.call(container.querySelectorAll("olum")).filter((p) => {
         const anc = p.parentElement && p.parentElement.closest && p.parentElement.closest("olum");
@@ -304,11 +305,11 @@ export default (function () {
       });
     },
     buildTree(comp, store, compKey) {
+      this.__renderingKey = compKey;
       const rootElm = comp.__OLUM__.getElm;
+      this.__renderingKey = null;
       if (!rootElm) return null;
       const self = this;
-      // lazy global factory registry: name -> factory. Accumulated from every instance's components map
-      // as we descend, so slot-passed and cross-file components resolve regardless of where they were declared.
       const registry = window.olum.app.registry || (window.olum.app.registry = {});
 
       function renderChildren(containerComp, containerKey, containerElm) {
@@ -322,12 +323,6 @@ export default (function () {
             console.warn("olum: couldn't find " + name + " Component while building the tree!");
             return;
           }
-          // #3 (keyed reconciliation): a placeholder rendered inside a keyed <for> carries data-o-key
-          // (the evaluated `key={...}` value for that item). Keyed instances are stored under
-          // "...Name@<key>", so the SAME instance — and therefore its state and DOM — is reused for a
-          // given item no matter where it moves, is inserted, or is removed in the list. Without a key
-          // we fall back to positional "...Name#<i>" keys, where state follows position, not identity
-          // (delete the middle item of a list and the survivors inherit the wrong neighbour's state).
           const keyVal = placeholder.getAttribute("data-o-key");
           let instanceKey;
           if (keyVal !== null && keyVal !== "") {
@@ -337,8 +332,6 @@ export default (function () {
             instanceKey = containerKey + ">" + name + "#" + occ[name];
           }
 
-          // compute this render's incoming props from the placeholder (re-read every pass so
-          // re-renders pick up fresh parent values)
           const propsJson = placeholder.getAttribute("data-o-props");
           const incomingProps = propsJson ? JSON.parse(decodeURIComponent(propsJson)) : {};
           const incomingPropSources = {};
@@ -351,11 +344,6 @@ export default (function () {
                 srcKey = parts[2];
               if (propKey && kind && srcKey) incomingPropSources[propKey] = { kind, key: srcKey };
             });
-          // FUNCTION PROPS: functions can't cross the JSON data-o-props channel, so they're
-          // resolved live from the parent instance on every render pass.
-          //   kind "method" — toggle="{toggle}" names a parent top-level function -> methodsRef
-          //   kind "props"  — toggle="{props().toggle}" forwards a prop; if JSON dropped it
-          //                   (it was a function), pull it from the parent's own incoming props
           Object.keys(incomingPropSources).forEach((propKey) => {
             const desc = incomingPropSources[propKey];
             if (desc.kind === "method") {
@@ -372,11 +360,9 @@ export default (function () {
           // reuse the instance from a previous render (preserves its state) or mint a fresh one
           let child = store[instanceKey];
           if (!child) {
-            // pre-seed the store slot with prop data BEFORE running the factory, so the component's
-            // TOP-LEVEL props() (not just props() inside onMount) resolves during factory execution.
             store[instanceKey] = { parentCompName: containerKey, incomingProps, incomingPropSources, children: childrenHtml };
             const created = factory(instanceKey);
-            Object.assign(store[instanceKey], created); // merge el/__OLUM__/hooks/incomingPropsProxy/stateProps
+            Object.assign(store[instanceKey], created); // merge el/__OLUM__/hooks/stateProps
             child = store[instanceKey];
           } else {
             // existing instance (re-render): refresh props/children, keep its state
@@ -386,7 +372,9 @@ export default (function () {
             child.children = childrenHtml;
           }
 
+          self.__renderingKey = instanceKey;
           const elm = child.__OLUM__.getElm;
+          self.__renderingKey = null;
           if (elm) {
             elm.setAttribute("data-o-if", placeholder.getAttribute("if") ? placeholder.getAttribute("if") : "olum-no-condition"); // display if condition value (truthy, falsy)
             placeholder.replaceWith(elm);
@@ -447,6 +435,15 @@ export default (function () {
 
     useRouter(router) {
       // share props/methods with router
+      window.olum.router = {
+        pathname: router.pathname,
+        push: router.push,
+        replace: router.replace,
+        back: router.back,
+        forward: router.forward,
+        go: router.go,
+        extractParams: router.extractParams
+      };
       router.__proto__.rootElm = this.root;
       router.render = (view) => this.useComponent(view);
       if (router.isReady) router.listen();
@@ -514,20 +511,7 @@ export default (function () {
     }
 
     setupListeners(store) {
-      function mkHash(str) {
-        var hash = 0;
-        var i;
-        var char;
-        if (str.length === 0) return hash;
-        for (i = 0; i < str.length; i++) {
-          char = str.charCodeAt(i);
-          hash = (hash << 5) - hash + char;
-          hash |= 0;
-        }
-        return hash;
-      }
-
-      // const snapshots = {}; // persists across re-renders: { [compName]: Map<pathKey, entry> }
+      const mkHash = window.olum.mkHash;
 
       window.addEventListener("updateOlumComp", (e) => {
         if (e && e.detail && e.detail.compName && e.detail.compId && e.detail.hash) {
@@ -537,21 +521,6 @@ export default (function () {
           if (!document.body.contains(comp.el)) return; // comp was unmounted; ignore stale state updates
 
           const compName = e.detail.compName;
-
-          // snapshot input values of child components currently in DOM
-          // only child components (data-child-of !== compName) so we don't overwrite state inputs with stale values
-          // entries not updated here (hidden components) keep their previous snapshot value intact
-          // if (!snapshots[compName]) snapshots[compName] = new Map();
-          // comp.el.querySelectorAll("input, textarea, select").forEach(field => {
-          //   const childOf = field.getAttribute("data-child-of");
-          //   if (childOf && childOf !== compName) {
-          //     const path = this.getPath(field, comp.el);
-          //     const entry = { path };
-          //     if (field.type === "checkbox" || field.type === "radio") entry.checked = field.checked;
-          //     else entry.value = field.value;
-          //     snapshots[compName].set(JSON.stringify(path), entry);
-          //   }
-          // });
 
           const innerNames = Object.keys(store).filter((name) => name !== compName);
           const prevMounted = {};
@@ -570,14 +539,6 @@ export default (function () {
           if (!treeElm) return console.warn("olum: couldn't build tree!");
           comp.el.replaceWith(treeElm);
 
-          // restore child component input values after rebuild
-          // snapshots[compName].forEach(({ path, value, checked }) => {
-          //   const field = this.findByPath(treeElm, path);
-          //   if (!field) return; // component is hidden in this render, skip
-          //   if (checked !== undefined) field.checked = checked;
-          //   else if (value !== undefined) field.value = value;
-          // });
-
           // load prev active element after re-render (buildTree) to focus (e.g. input) or restore its data (e.g. forms)
           if (activePath && activePath.length) {
             const toRestore = this.findByPath(treeElm, activePath);
@@ -588,8 +549,6 @@ export default (function () {
             }
           }
 
-          // after rebuild, call lifecycle hooks for any inner component that changed visibility.
-          // recompute keys here so instances created during this rebuild (e.g. a grown loop) are included.
           const afterNames = Object.keys(store).filter((name) => name !== compName);
           afterNames.forEach((name) => {
             const c = store[name];
@@ -619,8 +578,6 @@ export default (function () {
     }
 
     share(entry) {
-      // store now holds live instances keyed by runtime instance key; buildTree populates it lazily.
-      // registry holds name->factory and is accumulated as the tree is walked.
       const store = {};
       const rootKey = entry.__OLUM__.compName;
       store[rootKey] = entry;
@@ -633,14 +590,36 @@ export default (function () {
 })();
 
 export const onMount = (cb) => cb
-export const params = (path, pathname) => extractParams(path, pathname);
-// per-instance props accessor. The compiler binds each `props()` call to this component's runtime
-// store key: `props()` -> `props(_storeKey)`. Delegates to the olum runtime proxy factory above.
+export const params = (path, pathname) => window.olum.router.extractParams(path, pathname);
+export const push = (path) => window.olum.router.push(path);
+export const replace = (path) => window.olum.router.replace(path);
+export const back = () => window.olum.router.back();
+export const pathname = () => window.olum.router.pathname();
+export const forward = () => window.olum.router.forward();
+export const go = (n) => window.olum.router.go(n);
 export const props = (storeKey) => window.olum.props(storeKey);
-export const store = (key) => { // get the correct component store by name instead of memorizing the location of component
-  const componentsNames = ["page", ...Object.keys(window.olum.app.registry)];
-  const index = componentsNames.indexOf(key);
-  const storeKeys = Object.keys(window.olum.app.store); 
-  const realKey = storeKeys[index];
-  return window.olum.app.store[realKey];
-}
+export const store = (init) => {
+  if (!window.olum.store) throw new Error("olum: store is unavailable — the store module (./store.js / olum-store package) is not installed");
+  return window.olum.store(init);
+};
+if (typeof window !== "undefined") await import("olum-store").then((m) => (window.olum.store = m.default(window.olum))).catch(() => {});
+export const scope = (name, index = 0) => {
+  const entries = (window.olum.app && window.olum.app.store) || {};
+  const matches = Object.keys(entries).filter((key) => {
+    const tail = key.split(">").pop();
+    return tail === name || tail.split(/[#@]/)[0] === name;
+  });
+  const key = matches[index];
+  if (!key) {
+    console.warn('olum: scope("' + name + '") — no mounted component matches that name');
+    return null;
+  }
+  const entry = entries[key];
+  return {
+    key,
+    el: entry.el || null,
+    state: entry.stateProps || null,
+    props: entry.props || null,
+    methods: entry.methods || null,
+  };
+};

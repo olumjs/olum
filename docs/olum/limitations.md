@@ -8,7 +8,7 @@ OlumJS is deliberately small, and a few rough edges come with that. Here's what 
 
 ## 1. Re-renders rebuild the whole stateful component
 
-When a component has `state` and it changes, Olum rebuilds that **entire target component — including its inner child components**. Any live DOM state that Olum doesn't track is lost in the rebuild: a playing `<video>` restarts, a running animation resets, and focused/typed-in `form` inputs lose their value and focus.
+When a component has `state` and it changes, Olum rebuilds that **entire target component — including its inner child components**. Any live DOM state that Olum doesn't track is lost in the rebuild: a playing `<video>` restarts, a running animation resets, and a form input whose value isn't bound to `state` loses what was typed. (The **focused** element is an exception — after a rebuild the runtime restores its focus and caret position, and a bound input re-renders with its value from `state`.)
 
 **Avoid it by design:** keep the reactive `state` **outside** the component that holds the video / animation / form inputs. If that media component stays stateless, it never re-renders and its DOM state is preserved.
 
@@ -35,24 +35,21 @@ When a component has `state` and it changes, Olum rebuilds that **entire target 
 <button onclick="inc()">{state.count}</button>
 ```
 
-## 2. Reactive state is one level deep
+## 2. State re-renders synchronously — once per mutation
 
-`state` is wrapped in a shallow proxy: only assignments to its **top-level keys** are detected. Mutating nested data in place — `state.user.name = "Bo"`, `state.todos.push(t)`, `state.todos[0].done = true` — updates the object but triggers **no re-render and no watcher**.
+`state` reactivity is [deep](/docs/state) (nested objects, arrays, `Map`, `Set`), and every mutation re-renders **synchronously**. An in-place `splice` / `shift` / `unshift` on a **large** state array therefore rebuilds the component once per shifted element within the same tick. Nothing paints mid-tick, so it's visually invisible — but it costs CPU on big lists.
 
-**Avoid it by design:** treat nested data as immutable and assign a **fresh value** to the top-level key:
+**Avoid it by design:** assign a fresh array in one step, or keep large / frequently-mutated collections in the [global store](/docs/global-store), whose writes are [microtask-batched](/docs/store-reactivity) so a multi-mutation action — even an in-place `splice` — paints once:
 
 ```js
-// ✗ silent — the proxy never sees these
-state.user.name = "Bo";
-state.todos.push(todo);
+// ✗ on a large state array: one sync rebuild per shifted element
+state.todos.splice(0, 1);
 
-// ✓ top-level assignment with a new reference
-state.user = { ...state.user, name: "Bo" };
-state.todos = [...state.todos, todo];
-state.todos = state.todos.map(t => t.id === id ? { ...t, done: true } : t);
+// ✓ one re-render — reassign a fresh array
+state.todos = state.todos.filter(t => t.id !== id);
 ```
 
-Note that re-assigning the **same reference** (`state.todos = state.todos`) is also skipped as a no-op — the new value must be a different reference. See [State & Reactivity](/docs/state).
+Also note: re-assigning the **same reference** (`state.todos = state.todos`) is skipped as a no-op — to force a re-render the new value must be a different reference. See [State & Reactivity](/docs/state).
 
 ## 3. No element refs, actions, or transitions
 
@@ -120,22 +117,3 @@ There is no built-in binding for an element's `clientWidth` / `clientHeight` (e.
 ## 7. No integrated unit testing
 
 There is no testing framework wired into OlumJS yet — no built-in test runner or component testing utilities. You can still test plain JS logic with any external tool, but there's no first-class story for testing components at the moment.
-
-## 8. Global store ergonomics
-
-There is already a **global store across the whole application**, together with the [scope system](/docs/scope) (private/public attributes on the `<script>` tag) for exposing props/methods. It's a little awkward in practice, though: a registered component's name isn't straightforward, so you reach it through its location key — e.g. `olum.app.store["page>App#0"]`.
-
-**For now:** use a single dedicated component for your store, put your props/methods in it, and access it by its location key.
-
-```html title="store.html"
-<!-- A dedicated store component that exposes its props/methods -->
-<!-- App.html (mounted at src/page.html) -->
-<script public>
-  const user = { name: "Ann" };
-  const login = () => { /* … */ };
-</script>
-
-// Access it elsewhere by its registered location key:
-olum.app.store["page>App#0"].user;
-olum.app.store["page>App#0"].login();
-```

@@ -19,5 +19,5 @@ Declare `const watcher = { ... }` with a function per `state` key; it fires on c
 ````
 
 :::warn
-Watchers follow the same [one-level-deep rule](/docs/state) as re-renders: they fire on **top-level key assignment** only. A nested mutation like `state.user.name = "Bo"` or `state.todos.push(t)` won't trigger the watcher — assign a fresh value to the key instead (`state.user = { ...state.user, name: "Bo" }`).
+Watchers fire on **top-level key assignment** only. A nested mutation like `state.user.name = "Bo"` or `state.todos.push(t)` re-renders (reactivity is [deep](/docs/state)) but does **not** fire the watcher — when you need the watcher to run, assign a fresh value to the key (`state.user = { ...state.user, name: "Bo" }`).
 :::

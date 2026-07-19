@@ -11,7 +11,7 @@ There is no `model` attribute — every binding is the same manual pair: a **val
 ```html title="Component.html"
 <input value="{state.text}" oninput="(e) => state.text = e.target.value" />
 
-<!-- textarea binds through value="" too (not through its children) -->
+<!-- textarea binds through value="" too — if it also has text content, value wins -->
 <textarea value="{state.text}" oninput="(e) => state.text = e.target.value"></textarea>
 
 <!-- e.target.value is always a string — cast numbers with a unary + -->

@@ -18,7 +18,14 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <!-- STRING ATTRIBUTES (literal + {expr}) -->
 <div class="box {state.cls}" style="color:{state.color}" title="Hi {state.name}"></div>
 
-<!-- EVENTS (code in "") -->
+<!-- BOOLEAN ATTRIBUTES (whole-value {expr} → presence toggle) -->
+<button disabled="{state.busy}">Save</button>
+<details open="{state.expanded}">…</details>
+
+<!-- ASSET URLS (root-absolute, served from public/) -->
+<img src="/assets/logo.svg" />
+
+<!-- EVENTS (code in "", ONE on* attribute per element) -->
 <button onclick="save()">Save</button>
 <input oninput="(e)=> state.text = e.target.value" />
 <input oninput="setValue($event)" />
@@ -54,13 +61,13 @@ A condensed cheat-sheet covering all template syntax at a glance.
 </Card>
 
 <!-- PROPS (in the child's <script>) -->
-const { title, children } = props();  // INITIAL snapshot, no onMount needed
+const { title, children } = props();  // destructured names stay LIVE (compiled to fresh reads)
 const { size = "md" } = props();      // default value when the parent omits it
-{props().title}                       // LATEST value, call anywhere (template or method)
-{props().children}                    // LATEST slot content
+{title} {children}                    // use the names anywhere — always the LATEST values
+{props().title}                       // equivalent direct read
 
 <!-- FUNCTION PROPS (component events) -->
-<Inner onMessage="{handleMessage}" />  <!-- child calls: props().onMessage(payload) -->
+<Inner onMessage="{handleMessage}" />  <!-- child: const { onMessage } = props(); onMessage(payload) -->
 
 <!-- DERIVED VALUES (plain functions) -->
 const doubled = () => state.count * 2;

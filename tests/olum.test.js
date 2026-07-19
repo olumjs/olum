@@ -39,6 +39,7 @@ const FAIL_ICON = red("✖");
 // (the Olum class) and the `export const` accessors are rewritten to plain locals
 // and handed back so tests can reach both the class and the `window.olum` singleton.
 const OLUM_SRC = fs.readFileSync(path.join(__dirname, "../src/olum.js"), "utf8");
+const STORE_SRC = fs.readFileSync(path.join(__dirname, "../src/store.js"), "utf8");
 function load() {
   const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", { url: "http://localhost/" });
   // The module reads bare `window`/`document`/`CustomEvent`; point the node globals
@@ -48,7 +49,12 @@ function load() {
   global.CustomEvent = dom.window.CustomEvent;
   global.Node = dom.window.Node;
 
-  let src = OLUM_SRC.replace(/^\s*export\s+default\s+/m, "const __OlumClass = ").replace(/^\s*export\s+const\s+/gm, "const ");
+  // olum.js pulls the optional store in with a one-line top-level-await dynamic import, which
+  // `new Function` can't eval. Inline store.js (its `export default function` becomes a plain
+  // declaration), strip that await-import line, and wire the store manually below.
+  let src = STORE_SRC.replace(/^\s*export\s+default\s+/m, "");
+  src += "\n" + OLUM_SRC.replace(/^.*await import\(.*$/gm, "").replace(/^\s*export\s+default\s+/m, "const __OlumClass = ").replace(/^\s*export\s+const\s+/gm, "const ");
+  src += "\nwindow.olum.store = createStore(window.olum);";
   // `params` is intentionally omitted — it's router-bound (delegates to extractParams,
   // which lives outside this module) and is covered by the router's own tests.
   src += "\n;return { Olum: __OlumClass, onMount: onMount, props: props };";
@@ -290,13 +296,62 @@ check("deleteProperty emits an update too", () => {
   return fired && !("tmp" in state);
 });
 
-// ── §8 proxyHandlerForStore() ─────────────────────────────────────────────────
-section("§8 proxyHandlerForStore()");
+// deep reactivity: nested objects, arrays, Map and Set mutations all emit for the root component
+check("nested object set emits", () => {
+  const { olum, window, state } = reactiveState({ user: { name: "a" } });
+  const p = olum.proxyHandler(state, null, null);
+  let fired = null;
+  window.addEventListener("updateOlumComp", (e) => (fired = e.detail));
+  p.user.name = "b";
+  return fired && fired.compName === "App" && state.user.name === "b";
+});
+
+check("array push emits", () => {
+  const { olum, window, state } = reactiveState({ items: ["x"] });
+  const p = olum.proxyHandler(state, null, null);
+  let fired = 0;
+  window.addEventListener("updateOlumComp", () => fired++);
+  p.items.push("y");
+  return fired > 0 && state.items.length === 2;
+});
+
+check("Set.add and Map.set emit; size/get work through the proxy", () => {
+  const { olum, window, state } = reactiveState({ tags: new Set(["a"]), meta: new Map([["k", { n: 1 }]]) });
+  const p = olum.proxyHandler(state, null, null);
+  let fired = 0;
+  window.addEventListener("updateOlumComp", () => fired++);
+  p.tags.add("b");
+  p.meta.set("k2", 2);
+  p.meta.get("k").n = 5; // object from Map.get is reactive too
+  return fired === 3 && p.tags.size === 2 && state.meta.get("k").n === 5;
+});
+
+check("nested proxies have stable identity", () => {
+  const { olum, state } = reactiveState({ user: { name: "a" } });
+  const p = olum.proxyHandler(state, null, null);
+  return p.user === p.user;
+});
+
+check("non-plain objects (Date) pass through raw", () => {
+  const { olum, state } = reactiveState({ when: new Date() });
+  const p = olum.proxyHandler(state, null, null);
+  return typeof p.when.getTime() === "number" && p.when === state.when;
+});
+
+check("assigning a wrapped value back stores the raw object", () => {
+  const { olum, state } = reactiveState({ user: { name: "a" } });
+  const p = olum.proxyHandler(state, null, null);
+  p.copy = p.user; // p.user is a nested proxy; the raw object must land in state
+  return state.copy === state.user;
+});
+
+// ── §8 proxyHandlerForScope() ─────────────────────────────────────────────────
+section("§8 proxyHandlerForScope()");
 
 check("writes mirror into the original proxy", () => {
   const { olum } = load();
   const original = {};
-  const mirror = olum.proxyHandlerForStore({}, original);
+  const mirror = olum.proxyHandlerForScope({}, original);
   mirror.a = 9;
   return original.a === 9 && mirror.a === 9;
 });
@@ -338,33 +393,31 @@ check("a missing store entry yields undefined props", () => {
   return props("ghost").v === undefined;
 });
 
-check("writing a state-sourced prop writes back to the parent's state", () => {
+// props are READ-ONLY (one-way data flow): assignments warn and change nothing —
+// children update parent-owned values via callback props, shared values via the store.
+check("assigning a prop warns and is ignored", () => {
   const { props } = withStore({
-    child: {
-      parentCompName: "parent",
-      incomingProps: { v: 1 },
-      incomingPropSources: { v: { kind: "state", key: "count" } },
-    },
+    child: { parentCompName: "parent", incomingProps: { v: 1 } },
     parent: { stateProps: { count: 0 } },
   });
+  let warned = false;
+  const origWarn = console.warn;
+  console.warn = (msg) => { if (String(msg).includes("read-only")) warned = true; };
   props("child").v = 99;
-  const store = global.window.olum.app.store;
-  return store.parent.stateProps.count === 99;
+  console.warn = origWarn;
+  return warned && props("child").v === 1;
 });
 
-check("writing a props-sourced prop chains up the parent's props proxy", () => {
-  // grandchild → child forwarding: a `props` source writes into the parent's
-  // incomingPropsProxy (which itself recurses further up until a state owner).
+check("assigning a prop leaves the parent's state untouched", () => {
   const { props } = withStore({
-    grandchild: {
-      parentCompName: "child",
-      incomingProps: { v: 1 },
-      incomingPropSources: { v: { kind: "props", key: "w" } },
-    },
-    child: { incomingPropsProxy: {} },
+    child: { parentCompName: "parent", incomingProps: { v: 1 } },
+    parent: { stateProps: { count: 0 } },
   });
-  props("grandchild").v = 77;
-  return global.window.olum.app.store.child.incomingPropsProxy.w === 77;
+  const origWarn = console.warn;
+  console.warn = () => {};
+  props("child").v = 99;
+  console.warn = origWarn;
+  return global.window.olum.app.store.parent.stateProps.count === 0;
 });
 
 // ── §11 directOlums() ─────────────────────────────────────────────────────────
@@ -594,7 +647,7 @@ if (failed) {
 }
 
 // Guard against a whole section silently disappearing. Bump when you add/remove tests.
-const EXPECTED_CHECKS = 52;
+const EXPECTED_CHECKS = 58;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");

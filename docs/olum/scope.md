@@ -84,3 +84,27 @@ isActive  →  exclude-is-active
 :::tip
 Reactive `state` is governed by the **props** scope. Exclude the whole reactive object with `exclude-state` under a public-props group to keep it private.
 :::
+
+## Reading the public surface — `scope()`
+
+The consumer of these visibility rules is `scope()`, imported from `olum`: it reaches a **mounted** component by name from anywhere — another component, devtools, a test:
+
+```js
+import { scope } from "olum";
+
+const badge = scope("StatusBadge");
+badge.props;    // the PUBLIC props (per the rules above)
+badge.methods;  // the PUBLIC methods
+badge.state;    // the live state proxy — writing to it re-renders that component
+badge.el;       // the component's root element
+badge.key;      // its runtime instance key
+```
+
+- Several instances mounted? Pass the occurrence index: `scope("Item", 2)`.
+- No match → returns `null` and logs a console warning.
+
+What counts as a prop or method: **props** are top-level `const`s with a simple initializer (a literal, object, array, ternary, or another name); **methods** are top-level function declarations or `const fn = () => …`. Anything else (e.g. `const x = compute()`) isn't part of the scoped surface — it still works inside the component, it just isn't exposed.
+
+:::tip
+`scope()` is an escape hatch. For state that several components share by design, prefer the [global store](/docs/global-store).
+:::

@@ -66,3 +66,7 @@ Inside `onMount`, `host` refers to this component's own root DOM element — no 
   });
 </script>
 ```
+
+:::warn
+Call `onMount` **once** per component — only the first call is wired; a second call is silently ignored. Put all setup in the one callback and return one combined cleanup.
+:::
