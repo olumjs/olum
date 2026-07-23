@@ -56,16 +56,17 @@ Non-plain objects (`Date`, DOM nodes, class instances) are **not** tracked — a
 Re-assigning the **same reference** back (`state.todos = state.todos`) is a no-op — unchanged values are skipped. To force a re-render without mutating, assign a fresh object/array (spread, `map`, `filter`, `slice`, …).
 :::
 
-## Large arrays: prefer reassignment or the global store
+## Re-renders are batched
 
-`state` emits **synchronously, once per mutation**. That's invisible for typical writes, but an in-place `splice` / `shift` / `unshift` on a **large** array rebuilds the component once per shifted element within the same tick — nothing paints mid-tick, yet it costs CPU. For big or frequently-mutated collections either:
+[Watchers](/docs/watchers) fire **synchronously, once per mutation**, but **re-renders are batched per microtask**: `state.a++; state.b++` — or an in-place `splice` that shifts many elements — costs a **single** re-render pass, and that pass [patches the DOM in place](/docs/limitations) rather than rebuilding it. Mutate `state` however reads best — including big arrays with `push`/`splice`; there's no perf reason to reach for reassignment or the store.
+
+One consequence: the DOM is **not** updated in the same statement as the write. Code that must read the freshly-rendered DOM immediately after a write can settle pending re-renders explicitly:
 
 ```js
-// ✓ assign a fresh array — exactly one re-render
-state.todos = state.todos.filter(t => t.id !== id);
+state.count++;
+window.olum.flushUpdates();          // settle re-renders NOW (mostly useful in tests)
+host.querySelector("span").textContent; // fresh
 ```
-
-or keep the list in the **[global store](/docs/global-store)**, whose writes are **microtask-batched** — a multi-mutation action, even an in-place `splice`, paints once. See [Store Reactivity & Batching](/docs/store-reactivity).
 
 ## Declare `state` literally
 

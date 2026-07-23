@@ -15,15 +15,15 @@ const comment =
 */
 `;
 
-gulp.task("compile", () => {
-  return gulp
-    .src("./src/olum.js")
-    .pipe(concat("olum.min.js"))
-    // .pipe(babel({ presets: ["@babel/preset-env"] }))
-    .pipe(uglify())
-    .pipe(header(comment))
-    .pipe(gulp.dest("dist"));
-});
-gulp.task("copy", () => gulp.src("./src/olum.js").pipe(header(comment)).pipe(gulp.dest("dist")));
+// gulp.task("compile", () => {
+//   return gulp
+//     .src("./src/olum.js")
+//     .pipe(concat("olum.min.js"))
+//     // .pipe(babel({ presets: ["@babel/preset-env"] }))
+//     .pipe(uglify())
+//     .pipe(header(comment))
+//     .pipe(gulp.dest("dist"));
+// });
+gulp.task("copy", () => gulp.src(["./src/olum.js", "./src/vdom.js", "./src/transition.js"]).pipe(header(comment)).pipe(gulp.dest("dist")));
 
-gulp.task("default", gulp.series(["compile", "copy"]));
+gulp.task("default", gulp.series(["copy"]));

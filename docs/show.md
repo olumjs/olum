@@ -4,7 +4,7 @@ group: Template Syntax
 order: 70
 ---
 
-Like `<if>`, but keeps the element in the DOM and toggles `display:none`.
+Like `<if>`, but keeps the content in the DOM and only toggles its visibility.
 
 ```html title="Component.html"
 <show when="state.visible">
@@ -12,6 +12,8 @@ Like `<if>`, but keeps the element in the DOM and toggles `display:none`.
 </show>
 ```
 
+`<show>` compiles to **one stable wrapper** — `<div data-o-show>` — whose `display` flips between `contents` (visible: the wrapper generates no layout box, so children lay out as if it weren't there) and `none` (hidden). Because the structure is identical in both states, toggling only rewrites that one style — the content nodes are never replaced, so a playing `<video>`, a running animation, or text typed into an input all survive hide/show.
+
 :::note
-When `when` is falsy the content stays in the DOM wrapped in a `<div style="display:none">`. The wrapper only exists in the hidden state — avoid CSS that depends on the exact parent/child chain inside `<show>`.
+The wrapper is present in **both** states, so CSS with direct-child combinators through it (`.parent > .panel`) won't match — target `[data-o-show] > .panel` or drop the `>`. And since a `<div>` is invalid inside `<table>`/`<select>` structures, don't wrap table rows or options in `<show>` — use [`<if>`](/docs/conditionals) or a style binding there instead.
 :::

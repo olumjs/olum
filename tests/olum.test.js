@@ -1,20 +1,3 @@
-// ============================================================================
-// OlumJS runtime test suite — the counterpart to compiler.test.js.
-//
-// compiler.test.js exercises the *compiler* (a pure string->string function).
-// This file exercises the *runtime* in core/olum.js: the browser-side helpers
-// the compiled output calls at render time — escaping, reactivity (proxyHandler),
-// the props() accessor, DOM helpers, the component tree builder, etc.
-//
-// The runtime is written as an ES module that expects a DOM (`window`/`document`)
-// and installs itself as `window.olum`. We load it under jsdom: read the source,
-// rewrite its `export`s into locals, and eval it against a fresh jsdom global so
-// each `load()` gets an isolated `window.olum` (tests that mutate window.olum.app
-// don't leak into one another).
-//
-// Run:  node tests/olum.test.js
-// ============================================================================
-
 const fs = require("fs");
 const path = require("path");
 const { JSDOM } = require("jsdom");
@@ -22,7 +5,6 @@ const { JSDOM } = require("jsdom");
 let passed = 0;
 let failed = 0;
 
-// ── Output styling (copied from compiler.test.js so the two suites look alike) ─
 const COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
 const paint = (code, s) => (COLOR ? `\x1b[${code}m${s}\x1b[0m` : s);
 const green = (s) => paint("32", s);
@@ -34,35 +16,61 @@ const cyan = (s) => paint("36", s);
 const PASS_ICON = green("✔");
 const FAIL_ICON = red("✖");
 
-// ── Runtime loader ───────────────────────────────────────────────────────────
-// Build a fresh jsdom + a freshly-evaluated copy of core/olum.js. `export default`
-// (the Olum class) and the `export const` accessors are rewritten to plain locals
-// and handed back so tests can reach both the class and the `window.olum` singleton.
-const OLUM_SRC = fs.readFileSync(path.join(__dirname, "../src/olum.js"), "utf8");
-const STORE_SRC = fs.readFileSync(path.join(__dirname, "../src/store.js"), "utf8");
+const OLUM_SRC = fs.readFileSync(
+  path.join(__dirname, "../core/olum.js"),
+  "utf8",
+);
+const VDOM_SRC = fs.readFileSync(
+  path.join(__dirname, "../core/vdom.js"),
+  "utf8",
+);
+const STORE_SRC = fs.readFileSync(
+  path.join(__dirname, "../core/store.js"),
+  "utf8",
+);
+const TRANSITION_SRC = fs.readFileSync(
+  path.join(__dirname, "../core/transition.js"),
+  "utf8",
+);
 function load() {
-  const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", { url: "http://localhost/" });
-  // The module reads bare `window`/`document`/`CustomEvent`; point the node globals
-  // at this jsdom instance so its own `window.olum = olum` install lands here.
+  const dom = new JSDOM(
+    "<!doctype html><html><head></head><body></body></html>",
+    { url: "http://localhost/" },
+  );
+
   global.window = dom.window;
   global.document = dom.window.document;
   global.CustomEvent = dom.window.CustomEvent;
   global.Node = dom.window.Node;
 
-  // olum.js pulls the optional store in with a one-line top-level-await dynamic import, which
-  // `new Function` can't eval. Inline store.js (its `export default function` becomes a plain
-  // declaration), strip that await-import line, and wire the store manually below.
   let src = STORE_SRC.replace(/^\s*export\s+default\s+/m, "");
-  src += "\n" + OLUM_SRC.replace(/^.*await import\(.*$/gm, "").replace(/^\s*export\s+default\s+/m, "const __OlumClass = ").replace(/^\s*export\s+const\s+/gm, "const ");
+  src +=
+    "\n" +
+    TRANSITION_SRC.replace(/^\s*export\s+default\s+transition;\s*$/m, "");
+  src +=
+    "\n" +
+    VDOM_SRC.replace(/^\s*import .*$/gm, "").replace(
+      /^\s*export\s+default\s+vdom;\s*$/m,
+      "",
+    );
+  src +=
+    "\n" +
+    OLUM_SRC.replace(/^\s*import .*$/gm, "")
+      .replace(/^.*await import\(.*$/gm, "")
+      .replace(/^\s*export\s+default\s+/m, "const __OlumClass = ")
+      .replace(/^\s*export\s+const\s+/gm, "const ");
   src += "\nwindow.olum.store = createStore(window.olum);";
-  // `params` is intentionally omitted — it's router-bound (delegates to extractParams,
-  // which lives outside this module) and is covered by the router's own tests.
+
   src += "\n;return { Olum: __OlumClass, onMount: onMount, props: props };";
   const exported = new Function(src)();
-  return { window: dom.window, document: dom.window.document, olum: dom.window.olum, ...exported };
+  return {
+    window: dom.window,
+    document: dom.window.document,
+    olum: dom.window.olum,
+    ...exported,
+  };
 }
 
-// ── Section / check plumbing (mirrors compiler.test.js) ───────────────────────
 let currentSection = "(no section)";
 const failedSections = [];
 
@@ -94,16 +102,19 @@ function section(title) {
   console.log("\n" + bold(cyan(title)));
 }
 
-console.log("\n" + bold("🧪 OlumJS runtime fixtures") + "\n========================");
+console.log(
+  "\n" + bold("🧪 OlumJS runtime fixtures") + "\n========================",
+);
 
-// ── §0 module loads & self-installs ──────────────────────────────────────────
-// If the ESM→locals rewrite in load() ever breaks, every downstream test would
-// fail with the same opaque error; this pins the failure to the loader itself.
 section("§0 module bootstrap");
 
 check("evaluating the module installs window.olum", () => {
   const { window } = load();
-  return window.olum && typeof window.olum.esc === "function" && typeof window.olum.buildTree === "function";
+  return (
+    window.olum &&
+    typeof window.olum.esc === "function" &&
+    typeof window.olum.buildTree === "function"
+  );
 });
 
 check("the default export is the Olum class", () => {
@@ -111,7 +122,6 @@ check("the default export is the Olum class", () => {
   return typeof Olum === "function" && typeof new Olum().use === "function";
 });
 
-// ── §1 esc() — escape-by-default ─────────────────────────────────────────────
 section("§1 esc() escape-by-default");
 
 check("escapes <, >, & into entities", () => {
@@ -136,7 +146,7 @@ check("numbers and plain strings pass through (stringified)", () => {
 
 check("ampersand is escaped first (no double-escaping)", () => {
   const { olum } = load();
-  // "&lt;" input must become "&amp;lt;" — not "&amp;amp;lt;"
+
   return olum.esc("&lt;") === "&amp;lt;";
 });
 
@@ -145,7 +155,6 @@ check("olum.html() marker is passed through unescaped", () => {
   return olum.esc(olum.html("<i>raw</i>")) === "<i>raw</i>";
 });
 
-// ── §2 html() — raw-HTML opt-in ──────────────────────────────────────────────
 section("§2 html() raw opt-in");
 
 check("returns an __olumHtml marker object", () => {
@@ -159,7 +168,6 @@ check("null/undefined value becomes empty string", () => {
   return olum.html(null).html === "" && olum.html(undefined).html === "";
 });
 
-// ── §3 clean() ────────────────────────────────────────────────────────────────
 section("§3 clean()");
 
 check('the literal string "null" becomes null', () => {
@@ -172,17 +180,24 @@ check("trims surrounding whitespace", () => {
   return olum.clean("  hi  ") === "hi";
 });
 
-// ── §4 type guards ────────────────────────────────────────────────────────────
 section("§4 type guards");
 
 check("isObj: objects/arrays true, null/primitives false", () => {
   const { olum } = load();
-  return olum.isObj({}) && olum.isObj([]) && !olum.isObj(null) && !olum.isObj("s") && !olum.isObj(3);
+  return (
+    olum.isObj({}) &&
+    olum.isObj([]) &&
+    !olum.isObj(null) &&
+    !olum.isObj("s") &&
+    !olum.isObj(3)
+  );
 });
 
 check("isFullArr: non-empty array only", () => {
   const { olum } = load();
-  return olum.isFullArr([1]) && !olum.isFullArr([]) && !olum.isFullArr({ a: 1 });
+  return (
+    olum.isFullArr([1]) && !olum.isFullArr([]) && !olum.isFullArr({ a: 1 })
+  );
 });
 
 check("isFullObj: object with keys only", () => {
@@ -190,7 +205,6 @@ check("isFullObj: object with keys only", () => {
   return olum.isFullObj({ a: 1 }) && !olum.isFullObj({});
 });
 
-// ── §5 mkElm() ────────────────────────────────────────────────────────────────
 section("§5 mkElm()");
 
 check("creates an element of the requested tag", () => {
@@ -209,7 +223,6 @@ check("omits data-olum when name/id are missing", () => {
   return olum.mkElm("div").getAttribute("data-olum") === null;
 });
 
-// ── §6 injectStyle() ──────────────────────────────────────────────────────────
 section("§6 injectStyle()");
 
 check("injects a <style> tag with the css into <head>", () => {
@@ -232,13 +245,14 @@ check("empty / whitespace css injects nothing", () => {
   return document.getElementById("olum-style-Empty") === null;
 });
 
-// ── §7 proxyHandler() — reactivity ────────────────────────────────────────────
 section("§7 proxyHandler() reactivity");
 
-// The proxy needs an __olum__ tag (compName/compId) to build the update event.
 function reactiveState(extra) {
   const { olum, window } = load();
-  const state = Object.assign({ count: 0, __olum__: { compName: "App", compId: "1" } }, extra);
+  const state = Object.assign(
+    { count: 0, __olum__: { compName: "App", compId: "1" } },
+    extra,
+  );
   return { olum, window, state };
 }
 
@@ -262,7 +276,7 @@ check("setting the same value does not emit", () => {
   const p = olum.proxyHandler(state, null, null);
   let fired = 0;
   window.addEventListener("updateOlumComp", () => fired++);
-  p.count = 0; // same as initial
+  p.count = 0;
   return fired === 0;
 });
 
@@ -273,7 +287,7 @@ check("the __olum__ tag is write-protected", () => {
   try {
     p.__olum__ = "hacked";
   } catch (e) {
-    threw = true; // strict-mode proxies throw on a false set trap
+    threw = true;
   }
   return threw || p.__olum__.compName === "App";
 });
@@ -296,7 +310,6 @@ check("deleteProperty emits an update too", () => {
   return fired && !("tmp" in state);
 });
 
-// deep reactivity: nested objects, arrays, Map and Set mutations all emit for the root component
 check("nested object set emits", () => {
   const { olum, window, state } = reactiveState({ user: { name: "a" } });
   const p = olum.proxyHandler(state, null, null);
@@ -316,13 +329,16 @@ check("array push emits", () => {
 });
 
 check("Set.add and Map.set emit; size/get work through the proxy", () => {
-  const { olum, window, state } = reactiveState({ tags: new Set(["a"]), meta: new Map([["k", { n: 1 }]]) });
+  const { olum, window, state } = reactiveState({
+    tags: new Set(["a"]),
+    meta: new Map([["k", { n: 1 }]]),
+  });
   const p = olum.proxyHandler(state, null, null);
   let fired = 0;
   window.addEventListener("updateOlumComp", () => fired++);
   p.tags.add("b");
   p.meta.set("k2", 2);
-  p.meta.get("k").n = 5; // object from Map.get is reactive too
+  p.meta.get("k").n = 5;
   return fired === 3 && p.tags.size === 2 && state.meta.get("k").n === 5;
 });
 
@@ -341,11 +357,10 @@ check("non-plain objects (Date) pass through raw", () => {
 check("assigning a wrapped value back stores the raw object", () => {
   const { olum, state } = reactiveState({ user: { name: "a" } });
   const p = olum.proxyHandler(state, null, null);
-  p.copy = p.user; // p.user is a nested proxy; the raw object must land in state
+  p.copy = p.user;
   return state.copy === state.user;
 });
 
-// ── §8 proxyHandlerForScope() ─────────────────────────────────────────────────
 section("§8 proxyHandlerForScope()");
 
 check("writes mirror into the original proxy", () => {
@@ -356,7 +371,6 @@ check("writes mirror into the original proxy", () => {
   return original.a === 9 && mirror.a === 9;
 });
 
-// ── §9 $emit() / dispatchEvent() ──────────────────────────────────────────────
 section("§9 $emit()");
 
 check("$emit dispatches a CustomEvent carrying the payload", () => {
@@ -367,11 +381,8 @@ check("$emit dispatches a CustomEvent carrying the payload", () => {
   return detail && detail.n === 1;
 });
 
-// ── §10 props() accessor ──────────────────────────────────────────────────────
 section("§10 props() accessor");
 
-// props(storeKey) proxies a live store entry: reads pull from incomingProps,
-// writes chain up to the parent's state source.
 function withStore(store) {
   const env = load();
   env.window.olum.app.store = store;
@@ -384,7 +395,9 @@ check("reads a prop from the instance's incomingProps", () => {
 });
 
 check("exposes slot content as props().children", () => {
-  const { props } = withStore({ child: { incomingProps: {}, children: "<p>hi</p>" } });
+  const { props } = withStore({
+    child: { incomingProps: {}, children: "<p>hi</p>" },
+  });
   return props("child").children === "<p>hi</p>";
 });
 
@@ -393,8 +406,6 @@ check("a missing store entry yields undefined props", () => {
   return props("ghost").v === undefined;
 });
 
-// props are READ-ONLY (one-way data flow): assignments warn and change nothing —
-// children update parent-owned values via callback props, shared values via the store.
 check("assigning a prop warns and is ignored", () => {
   const { props } = withStore({
     child: { parentCompName: "parent", incomingProps: { v: 1 } },
@@ -402,7 +413,9 @@ check("assigning a prop warns and is ignored", () => {
   });
   let warned = false;
   const origWarn = console.warn;
-  console.warn = (msg) => { if (String(msg).includes("read-only")) warned = true; };
+  console.warn = (msg) => {
+    if (String(msg).includes("read-only")) warned = true;
+  };
   props("child").v = 99;
   console.warn = origWarn;
   return warned && props("child").v === 1;
@@ -420,7 +433,6 @@ check("assigning a prop leaves the parent's state untouched", () => {
   return global.window.olum.app.store.parent.stateProps.count === 0;
 });
 
-// ── §11 directOlums() ─────────────────────────────────────────────────────────
 section("§11 directOlums()");
 
 check("returns only top-level <olum> placeholders (skips nested)", () => {
@@ -428,17 +440,24 @@ check("returns only top-level <olum> placeholders (skips nested)", () => {
   const container = document.createElement("div");
   container.innerHTML = `<olum name="A"><olum name="B"></olum></olum><olum name="C"></olum>`;
   const names = olum.directOlums(container).map((p) => p.getAttribute("name"));
-  return names.length === 2 && names.includes("A") && names.includes("C") && !names.includes("B");
+  return (
+    names.length === 2 &&
+    names.includes("A") &&
+    names.includes("C") &&
+    !names.includes("B")
+  );
 });
 
-// ── §12 buildTree() ───────────────────────────────────────────────────────────
 section("§12 buildTree()");
 
-// Minimal component factory shape buildTree consumes.
 function makeComp(html, components) {
   const el = global.document.createElement("div");
   el.innerHTML = html;
-  return { __OLUM__: { compName: "App", getElm: el, components: components || {} }, methodsRef: {}, hooks: {} };
+  return {
+    __OLUM__: { compName: "App", getElm: el, components: components || {} },
+    methodsRef: {},
+    hooks: {},
+  };
 }
 
 check("a childless component returns its root element unchanged", () => {
@@ -454,13 +473,21 @@ check("an <olum> placeholder is replaced by the child's element", () => {
   const { window, document } = load();
   const childElm = document.createElement("p");
   childElm.textContent = "child";
-  const childFactory = (instanceKey) => ({ __OLUM__: { compName: "Child", getElm: childElm, components: {} }, methodsRef: {}, hooks: {} });
+  const childFactory = (instanceKey) => ({
+    __OLUM__: { compName: "Child", getElm: childElm, components: {} },
+    methodsRef: {},
+    hooks: {},
+  });
   const comp = makeComp(`<olum name="Child"></olum>`, { Child: childFactory });
   window.olum.app.store = { App: comp };
   window.olum.app.registry = {};
   const tree = window.olum.buildTree(comp, window.olum.app.store, "App");
-  // placeholder gone, child <p> present
-  return !tree.querySelector("olum") && tree.querySelector("p") && tree.querySelector("p").textContent === "child";
+
+  return (
+    !tree.querySelector("olum") &&
+    tree.querySelector("p") &&
+    tree.querySelector("p").textContent === "child"
+  );
 });
 
 check("a missing child factory warns and leaves the placeholder", () => {
@@ -479,12 +506,8 @@ check("a missing child factory warns and leaves the placeholder", () => {
   return warned && comp.__OLUM__.getElm.querySelector("olum");
 });
 
-// ── §13 eventsHandler() ───────────────────────────────────────────────────────
-// data-o-event carries the RESOLVED serialization the compiled template produces
-// after its `${JSON.stringify(...)}` runs, e.g.  onclick|inc=[]  /  oninput|setVal=["$event"].
 section("§13 eventsHandler()");
 
-// Build a node carrying a resolved data-o-event string and wire it up.
 function wireEvent(tag, attr, methods, mode) {
   const { olum, window, document } = load();
   const el = document.createElement(tag);
@@ -496,26 +519,35 @@ function wireEvent(tag, attr, methods, mode) {
 
 check("substitutes $event with the real event object", () => {
   let received;
-  const { el, window } = wireEvent("input", 'oninput|setVal=["$event"]', { setVal: (e) => (received = e) });
+  const { el, window } = wireEvent("input", 'oninput|setVal=["$event"]', {
+    setVal: (e) => (received = e),
+  });
   el.dispatchEvent(new window.Event("input"));
   return received && received.type === "input";
 });
 
-// a <for>-scoped handler serializes the loop variable's per-item VALUE into the args
-// (compiler emits JSON.stringify(['$event', flavour])) — the runtime must pass it
-// back alongside the substituted event object
 check("extra serialized args (loop variables) are passed after $event", () => {
   let received;
-  const { el, window } = wireEvent("input", 'onchange|toggle=["$event","Mint choc chip"]', {
-    toggle: (e, flavour) => (received = { type: e.type, flavour }),
-  });
+  const { el, window } = wireEvent(
+    "input",
+    'onchange|toggle=["$event","Mint choc chip"]',
+    {
+      toggle: (e, flavour) => (received = { type: e.type, flavour }),
+    },
+  );
   el.dispatchEvent(new window.Event("change"));
-  return received && received.type === "change" && received.flavour === "Mint choc chip";
+  return (
+    received &&
+    received.type === "change" &&
+    received.flavour === "Mint choc chip"
+  );
 });
 
 check("a no-arg handler still receives the event", () => {
   let received;
-  const { el, window } = wireEvent("button", "onclick|inc=[]", { inc: (e) => (received = e) });
+  const { el, window } = wireEvent("button", "onclick|inc=[]", {
+    inc: (e) => (received = e),
+  });
   el.dispatchEvent(new window.Event("click"));
   return received && received.type === "click";
 });
@@ -532,14 +564,24 @@ check("multiple handlers in one attribute all fire", () => {
 
 check("the `once` modifier fires the handler a single time", () => {
   let n = 0;
-  const { el, window } = wireEvent("button", "onclick|inc=[]", { inc: () => n++ }, "once");
+  const { el, window } = wireEvent(
+    "button",
+    "onclick|inc=[]",
+    { inc: () => n++ },
+    "once",
+  );
   el.dispatchEvent(new window.Event("click"));
   el.dispatchEvent(new window.Event("click"));
   return n === 1;
 });
 
 check("the `prevent` modifier calls preventDefault", () => {
-  const { el, window } = wireEvent("button", "onclick|inc=[]", { inc: () => {} }, "prevent");
+  const { el, window } = wireEvent(
+    "button",
+    "onclick|inc=[]",
+    { inc: () => {} },
+    "prevent",
+  );
   const evt = new window.Event("click", { cancelable: true });
   el.dispatchEvent(evt);
   return evt.defaultPrevented === true;
@@ -563,16 +605,22 @@ check("an unknown method warns instead of throwing", () => {
   return warned;
 });
 
-// ── §14 stylesHandler() ───────────────────────────────────────────────────────
 section("§14 stylesHandler()");
 
 check("applies a data-o-style JSON object as inline styles", () => {
   const { olum, document } = load();
   const el = document.createElement("div");
-  el.setAttribute("data-o-style", JSON.stringify({ color: "red", padding: "8px" }));
+  el.setAttribute(
+    "data-o-style",
+    JSON.stringify({ color: "red", padding: "8px" }),
+  );
   olum.stylesHandler(el, [el], "App");
   const style = el.getAttribute("style") || "";
-  return /color:\s*red/.test(style) && /padding:\s*8px/.test(style) && el.getAttribute("data-o-style") === null;
+  return (
+    /color:\s*red/.test(style) &&
+    /padding:\s*8px/.test(style) &&
+    el.getAttribute("data-o-style") === null
+  );
 });
 
 check("a falsy style value is skipped", () => {
@@ -584,22 +632,24 @@ check("a falsy style value is skipped", () => {
   return !/color/.test(style) && /margin:\s*1px/.test(style);
 });
 
-// ── §15 handleMarkup() ────────────────────────────────────────────────────────
 section("§15 handleMarkup()");
 
-check("stamps data-child-of and the scope id on the element and descendants", () => {
-  const { olum, document } = load();
-  const el = document.createElement("div");
-  el.innerHTML = `<span></span>`;
-  olum.handleMarkup("App", "abc123", el, {});
-  const span = el.querySelector("span");
-  return (
-    el.getAttribute("data-child-of") === "App" &&
-    el.getAttribute("data-o-abc123") === "" &&
-    span.getAttribute("data-child-of") === "App" &&
-    span.getAttribute("data-o-abc123") === ""
-  );
-});
+check(
+  "stamps data-child-of and the scope id on the element and descendants",
+  () => {
+    const { olum, document } = load();
+    const el = document.createElement("div");
+    el.innerHTML = `<span></span>`;
+    olum.handleMarkup("App", "abc123", el, {});
+    const span = el.querySelector("span");
+    return (
+      el.getAttribute("data-child-of") === "App" &&
+      el.getAttribute("data-o-abc123") === "" &&
+      span.getAttribute("data-child-of") === "App" &&
+      span.getAttribute("data-o-abc123") === ""
+    );
+  },
+);
 
 check("handleMarkup also wires events on descendants", () => {
   const { olum, window, document } = load();
@@ -613,7 +663,6 @@ check("handleMarkup also wires events on descendants", () => {
   return fired && btn.getAttribute("data-o-event") === null;
 });
 
-// ── §16 named exports ─────────────────────────────────────────────────────────
 section("§16 named exports");
 
 check("onMount(cb) returns the callback as-is", () => {
@@ -628,7 +677,6 @@ check("props export delegates to window.olum.props", () => {
   return props("c").k === 1;
 });
 
-// ── Summary (mirrors compiler.test.js) ────────────────────────────────────────
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -646,11 +694,14 @@ if (failed) {
   console.log("");
 }
 
-// Guard against a whole section silently disappearing. Bump when you add/remove tests.
 const EXPECTED_CHECKS = 58;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
-  console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");
+  console.log(
+    yellow(
+      `⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`,
+    ) + "\n",
+  );
   process.exit(1);
 }
 

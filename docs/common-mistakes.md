@@ -25,7 +25,7 @@ OlumJS intentionally has **no naked braces** and **one way** to do each thing. T
 | `bind:this` / element refs | `host.querySelector(…)` in `onMount` | no refs — query within [`host`](/docs/lifecycle) |
 | `use:action` | wire up manually in `onMount`, clean up in its return | no action directive ([limitations](/docs/limitations)) |
 | `state.user.name = "Bo"` | works as-is | reactivity is [deep](/docs/state) |
-| `state.todos.push(t)` | works as-is | deep reactivity; for **large** arrays prefer reassignment or the global store ([why](/docs/limitations)) |
+| `state.todos.push(t)` | works as-is | deep reactivity — in-place mutations re-render, batched into one pass ([state](/docs/state)) |
 | `const { a, ...rest } = props()` | `props()` for the extras | `rest` is a one-time snapshot — only plain names stay [live](/docs/components) |
 | `const { user: { name } } = props()` | `const { user } = props()` then `user.name` | nested patterns aren't made live |
 | `const { [key]: v } = props()` | `props()[key]` | computed keys aren't made live |

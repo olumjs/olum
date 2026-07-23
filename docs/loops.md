@@ -49,16 +49,24 @@ In the numeric-range form (`i of 6`) only the first param is meaningful — `i` 
 
 ## Keyed loops — `key`
 
-When the loop body contains a **component**, add `key` so each instance is reused by identity across reorders/insertions/removals instead of by position:
+Add `key` to the `<for>` so each item is matched across reorders/insertions/removals **by identity, not by position**. Without it, deleting or reordering an item makes the runtime reuse each DOM node in place and repaint it with a neighbour's data — so anything a node "owns" (a checkbox/checkmark state, a playing video, typed-in text) appears to jump to the wrong row. With `key`, nodes are **moved** and left untouched instead.
+
+`key` is a plain JS expression (no braces, like `each`) that must be unique per item:
 
 ```html title="Component.html"
+<!-- component loop: each instance's state + DOM follows its item -->
 <for each="todo of state.todos" key="todo.id">
   <TodoRow todo="{todo}" />
+</for>
+
+<!-- plain-element loop: the repeated <li> is reconciled by identity -->
+<for each="todo of state.todos" key="todo.id">
+  <li data-done="{todo.done}">{todo.text}</li>
 </for>
 ```
 
 :::note
-`key` only matters for **component** loops. On a loop of plain elements there is no per-item instance to preserve, so `key` is a harmless no-op.
+`key` on `<for>` keys **both** component loops (the component instance is reused) and plain-element loops (the repeated root element is reused). It's applied to each loop's **direct root** only — inner children are never keyed. You can also put `key="{item.id}"` (with braces) directly on a plain element if you prefer; the `<for>` form is just the same thing applied for you.
 :::
 
 ## The numeric range needs a literal number

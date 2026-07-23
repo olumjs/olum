@@ -1,13 +1,21 @@
 /**
 * @name olum
-* @version 0.8.0
+* @version 0.9.0
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
 */
+import vdom from "./vdom.js";
+
+import transition from "./transition.js";
+
 export default (function () {
   var olum = {
-    app: {}, // this is a must to access live changes
+    version: "0.8.0",
+    framework: "OlumJS",
+    app: {},
+
+    flushUpdates() {},
     $emit(event, data) {
       this.dispatchEvent(event, data);
     },
@@ -22,13 +30,14 @@ export default (function () {
       for (i = 0; i < str.length; i++) {
         char = str.charCodeAt(i);
         hash = (hash << 5) - hash + char;
-        hash |= 0; // Convert to 32bit integer
+        hash |= 0;
       }
       return hash;
     },
     mkElm(type, compName, compId) {
       const el = document.createElement(type);
-      if (compName && compId) el.setAttribute("data-olum", JSON.stringify({ compName, compId }));
+      if (compName && compId)
+        el.setAttribute("data-olum", JSON.stringify({ compName, compId }));
       return el;
     },
     injectStyle(compName, cssContent) {
@@ -40,53 +49,63 @@ export default (function () {
       tag.textContent = cssContent;
       document.head.appendChild(tag);
     },
+
     proxyHandler(obj, watcher, el) {
       const mkHash = olum.mkHash;
-      const proxies = new WeakMap(); // raw object -> proxy: wrap each object once so identity stays stable
-      const raws = new WeakMap(); // proxy -> raw object: unwrap values assigned back into state
+      const proxies = new WeakMap();
+      const raws = new WeakMap();
 
-      function emit() {
-        // todo prefix compName with instance e.g. you may have one component used twice so compName-1 & compName-2
-        const dataObj = { compName: obj.__olum__.compName, compId: obj.__olum__.compId };
+      function emit(key) {
+        const dataObj = {
+          compName: obj.__olum__.compName,
+          compId: obj.__olum__.compId,
+        };
         dataObj.hash = mkHash(dataObj.compName + dataObj.compId);
+        if (typeof key === "string") dataObj.key = key;
         window.olum.$emit("updateOlumComp", dataObj);
       }
 
-      const nestedHandler = {
-        get: function (t, key) {
-          return wrap(t[key]);
-        },
-        set: function (t, key, val) {
-          val = raws.get(val) || val;
-          if (t[key] === val) return true;
-          t[key] = val;
-          emit();
-          return true;
-        },
-        deleteProperty: function (t, key) {
-          if (!(key in t)) return true;
-          delete t[key];
-          emit();
-          return true;
-        },
-      };
+      function mkNestedHandler(rootKey) {
+        return {
+          get: function (t, key) {
+            return wrap(t[key], rootKey);
+          },
+          set: function (t, key, val) {
+            val = raws.get(val) || val;
+            if (t[key] === val) return true;
+            t[key] = val;
+            emit(rootKey);
+            return true;
+          },
+          deleteProperty: function (t, key) {
+            if (!(key in t)) return true;
+            delete t[key];
+            emit(rootKey);
+            return true;
+          },
+        };
+      }
 
-      // Map/Set methods read internal slots, which proxies can't forward — so every method is
-      // rebound to run against the raw collection: mutators emit, Map.get results are wrapped.
       const collectionMutators = ["set", "add", "delete", "clear"];
-      const collectionHandler = {
-        get: function (coll, key) {
-          const val = coll[key];
-          if (typeof val !== "function") return val; // e.g. size
-          return function (...args) {
-            const result = val.apply(coll, args.map((a) => raws.get(a) || a));
-            if (collectionMutators.includes(key)) emit();
-            return key === "get" ? wrap(result) : result;
-          };
-        },
-      };
 
-      function wrap(val) {
+      function mkCollectionHandler(rootKey) {
+        return {
+          get: function (coll, key) {
+            const val = coll[key];
+            if (typeof val !== "function") return val;
+            return function (...args) {
+              const result = val.apply(
+                coll,
+                args.map((a) => raws.get(a) || a),
+              );
+              if (collectionMutators.includes(key)) emit(rootKey);
+              return key === "get" ? wrap(result, rootKey) : result;
+            };
+          },
+        };
+      }
+
+      function wrap(val, rootKey) {
         if (val === null || typeof val !== "object") return val;
         const isCollection = val instanceof Map || val instanceof Set;
         if (!isCollection && !Array.isArray(val)) {
@@ -95,7 +114,12 @@ export default (function () {
         }
         let p = proxies.get(val);
         if (!p) {
-          p = new Proxy(val, isCollection ? collectionHandler : nestedHandler);
+          p = new Proxy(
+            val,
+            isCollection
+              ? mkCollectionHandler(rootKey)
+              : mkNestedHandler(rootKey),
+          );
           proxies.set(val, p);
           raws.set(p, val);
         }
@@ -104,7 +128,9 @@ export default (function () {
 
       var handler = {
         get: function (obj, key) {
-          return key === "__olum__" ? obj[key] : wrap(obj[key]);
+          return key === "__olum__"
+            ? obj[key]
+            : wrap(obj[key], typeof key === "string" ? key : undefined);
         },
         set: function (obj, key, newVal) {
           if (key === "__olum__") return false;
@@ -112,19 +138,23 @@ export default (function () {
           const oldVal = obj[key];
           if (oldVal === newVal) return true;
           obj[key] = newVal;
-          if (watcher && watcher[key] && typeof watcher[key] === "function") watcher[key](oldVal, newVal);
-          emit();
+          if (watcher && watcher[key] && typeof watcher[key] === "function")
+            watcher[key](oldVal, newVal);
+
+          emit(typeof key === "string" ? key : undefined);
           return true;
         },
         deleteProperty: function (obj, key) {
           if (key === "__olum__") return false;
           delete obj[key];
-          emit();
+
+          emit(typeof key === "string" ? key : undefined);
           return true;
         },
       };
       return new Proxy(obj, handler);
     },
+
     proxyHandlerForScope(obj, originalProxy) {
       const handler = {
         get: function (obj, key) {
@@ -148,21 +178,27 @@ export default (function () {
       if (str === "null") return null;
       return str;
     },
+
     esc(value) {
       if (value === null || value === undefined) return "";
-      if (value && value.__olumHtml === true) return value.html; // explicit raw-HTML opt-in
+      if (value && value.__olumHtml === true) return value.html;
       return String(value)
-        .replace(/&/g, "&amp;") // must run first so the entities below aren't double-escaped
+        .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
     },
+
     html(value) {
       return { __olumHtml: true, html: value == null ? "" : String(value) };
     },
     eventsHandler(el, nodes, compName, methodsRefObj) {
       function event(item, str, modifiers) {
+        const sig =
+          str +
+          "\u0001" +
+          (modifiers && modifiers.length ? modifiers.join(".") : "");
         const eventName = str.split("|")[0];
         str = str.split("|").slice(1).join();
 
@@ -186,49 +222,61 @@ export default (function () {
           if (modifiers.includes("capture")) opts.capture = true;
         }
 
-        item.addEventListener(
-          eventName.slice(2),
-          (e) => {
-            if (modifiers && modifiers.length) {
-              if (modifiers.includes("prevent")) e.preventDefault();
-              if (modifiers.includes("stop")) e.stopPropagation();
-            }
+        const handler = (e) => {
+          if (opts.once && Array.isArray(e.currentTarget.__olumEvt)) {
+            const rest = e.currentTarget.__olumEvt.filter(
+              (x) => x.handler !== handler,
+            );
+            e.currentTarget.__olumEvt = rest.length ? rest : null;
+          }
+          if (modifiers && modifiers.length) {
+            if (modifiers.includes("prevent")) e.preventDefault();
+            if (modifiers.includes("stop")) e.stopPropagation();
+          }
 
-            function init() {
-              data.forEach((obj) => {
-                if (methodsRefObj[obj.methodName]) {
-                  if (obj.args.length) {
-                    const eventIndex = obj.args.indexOf("$event");
-                    if (eventIndex !== -1) obj.args.splice(eventIndex, 1, e);
-                    methodsRefObj[obj.methodName](...obj.args);
-                  } else {
-                    methodsRefObj[obj.methodName](e);
-                  }
+          function init() {
+            data.forEach((obj) => {
+              if (methodsRefObj[obj.methodName]) {
+                if (obj.args.length) {
+                  const args = obj.args.map((a) => (a === "$event" ? e : a));
+                  methodsRefObj[obj.methodName](...args);
                 } else {
-                  console.warn("olum: can't access the method");
+                  methodsRefObj[obj.methodName](e);
                 }
-              });
-            }
+              } else {
+                console.warn("olum: can't access the method");
+              }
+            });
+          }
 
-            if (modifiers && modifiers.length && modifiers.includes("self")) {
-              if (e.target === item) init();
-              return;
-            }
-            init();
-          },
-          opts
-        );
+          if (modifiers && modifiers.length && modifiers.includes("self")) {
+            if (e.target === e.currentTarget) init();
+            return;
+          }
+          init();
+        };
+        item.addEventListener(eventName.slice(2), handler, opts);
+
+        (item.__olumEvt || (item.__olumEvt = [])).push({
+          sig: sig,
+          name: eventName.slice(2),
+          handler: handler,
+          opts: opts,
+        });
 
         item.removeAttribute("data-o-event");
         item.removeAttribute("data-o-event-mode");
-        // item.removeAttribute("data-child-of");
       }
 
       nodes.forEach((node) => {
         const hasEvent = olum.clean(node.getAttribute("data-o-event"));
         const hasMode = olum.clean(node.getAttribute("data-o-event-mode"));
         const mode = hasMode && hasMode.trim() !== "" ? hasMode.split(".") : [];
-        if (hasEvent) event(node, hasEvent, mode);
+
+        if (hasEvent)
+          hasEvent
+            .split("OLUM_EVT_SEP")
+            .forEach((seg) => event(node, seg, mode));
       });
     },
     stylesHandler(el, nodes, compName) {
@@ -237,22 +285,19 @@ export default (function () {
         keys.forEach((key) => {
           const val = obj[key];
           if (val) {
-            // console.log({ key, val });
             str += key + ": " + val + "; ";
           }
         });
         str = str.trim();
-        // console.log(str);
+
         if (str !== "") item.setAttribute("style", str);
         item.removeAttribute("data-o-style");
-        // item.removeAttribute("data-child-of");
       }
 
       function style(item, str) {
         const obj = JSON.parse(str);
         const keys = Object.keys(obj);
         if (keys.length) {
-          // console.log("directObj: ", obj);
           setStyles(item, obj, keys);
         }
       }
@@ -272,7 +317,74 @@ export default (function () {
       });
       this.eventsHandler(el, nodes, compName, methods);
       this.stylesHandler(el, nodes, compName);
+      this.transitionHandler(nodes, methods);
       return el;
+    },
+
+    transitionHandler(nodes, methodsRefObj) {
+      const parseDefs = (str) =>
+        str.split("&").reduce((acc, chunk) => {
+          const eq = chunk.indexOf("=");
+          const head = chunk.slice(0, eq);
+          const rhs = chunk.slice(eq + 1);
+
+          if (head.charAt(0) === "@") {
+            const cb = methodsRefObj && methodsRefObj[rhs];
+            if (cb) (acc.events || (acc.events = {}))[head.slice(1)] = cb;
+            return acc;
+          }
+
+          if (head === "flip") {
+            let fp;
+            try {
+              fp = JSON.parse(rhs)[0];
+            } catch (e) {
+              fp = undefined;
+            }
+            acc.flip = fp || {};
+            return acc;
+          }
+          const colon = head.indexOf(":");
+          const dir = head.slice(0, colon);
+          const name = head.slice(colon + 1);
+          const fn =
+            (methodsRefObj && methodsRefObj[name]) ||
+            (olum.transitions && olum.transitions[name]);
+          if (!fn) {
+            console.warn("olum: unknown transition '" + name + "'");
+            return acc;
+          }
+          let params;
+          try {
+            params = JSON.parse(rhs)[0];
+          } catch (e) {
+            params = undefined;
+          }
+          acc[dir] = { fn, params };
+          return acc;
+        }, {});
+
+      nodes.forEach((node) => {
+        const raw = olum.clean(node.getAttribute("data-o-trans"));
+        if (!raw) return;
+        node.removeAttribute("data-o-trans");
+        node.__olumTrans = parseDefs(raw);
+
+        if (node.__olumTrans.flip !== undefined) {
+          node.__olumFlip = node.__olumTrans.flip;
+          node.setAttribute("data-o-flip", "");
+        }
+        if (node.__olumBaseStyle == null)
+          node.__olumBaseStyle = node.style.cssText;
+
+        if (node.__olumTrans.in) node.setAttribute("data-o-intro", "");
+
+        const raf =
+          typeof requestAnimationFrame === "function"
+            ? requestAnimationFrame
+            : (cb) => setTimeout(cb, 16);
+        raf(() => transition.playIntro(node));
+      });
     },
     isObj(obj) {
       return obj !== null && typeof obj === "object";
@@ -281,48 +393,87 @@ export default (function () {
       return !!(this.isObj(arr) && Array.isArray(arr) && arr.length);
     },
     isFullObj(obj) {
-      return !!(this.isObj(obj) && Array.isArray(Object.keys(obj)) && Object.keys(obj).length);
+      return !!(
+        this.isObj(obj) &&
+        Array.isArray(Object.keys(obj)) &&
+        Object.keys(obj).length
+      );
     },
+
     props(storeKey) {
-      return new Proxy({}, {
-        get(_, key) {
-          const entry = window.olum.app.store[storeKey];
-          if (!entry) return undefined;
-          // slot content lives on the store entry (set in buildTree), not in incomingProps — expose it as props().children
-          if (key === "children") return entry.children || "";
-          return entry.incomingProps ? entry.incomingProps[key] : undefined;
+      return new Proxy(
+        {},
+        {
+          get(_, key) {
+            const entry = window.olum.app.store[storeKey];
+            if (!entry) return undefined;
+
+            if (key === "children") return entry.children || "";
+            return entry.incomingProps ? entry.incomingProps[key] : undefined;
+          },
+          set(_, key) {
+            console.warn(
+              'olum: props are read-only — "' +
+                String(key) +
+                '" was not written. Pass a callback prop to update the parent, or share the value via the global store.',
+            );
+            return true;
+          },
         },
-        set(_, key) {
-          console.warn('olum: props are read-only — "' + String(key) + '" was not written. Pass a callback prop to update the parent, or share the value via the global store.');
-          return true;
-        },
-      });
+      );
     },
+
+    vdom: vdom,
+
+    transitions: transition.transitions,
+    easings: transition.easings,
+    transition: transition,
+
+    crossfade: transition.crossfade,
+
     directOlums(container) {
-      return Array.prototype.slice.call(container.querySelectorAll("olum")).filter((p) => {
-        const anc = p.parentElement && p.parentElement.closest && p.parentElement.closest("olum");
-        return !anc || !container.contains(anc);
-      });
+      return Array.prototype.slice
+        .call(container.querySelectorAll("olum"))
+        .filter((p) => {
+          const anc =
+            p.parentElement &&
+            p.parentElement.closest &&
+            p.parentElement.closest("olum");
+          return !anc || !container.contains(anc);
+        });
     },
     buildTree(comp, store, compKey) {
       this.__renderingKey = compKey;
       const rootElm = comp.__OLUM__.getElm;
       this.__renderingKey = null;
       if (!rootElm) return null;
+
+      rootElm.__olumKey = compKey;
       const self = this;
-      const registry = window.olum.app.registry || (window.olum.app.registry = {});
+
+      const registry =
+        window.olum.app.registry || (window.olum.app.registry = {});
 
       function renderChildren(containerComp, containerKey, containerElm) {
-        if (containerComp.__OLUM__.components) Object.assign(registry, containerComp.__OLUM__.components);
+        if (containerComp.__OLUM__.components)
+          Object.assign(registry, containerComp.__OLUM__.components);
         const placeholders = self.directOlums(containerElm);
-        const occ = {}; // per-name occurrence counter -> positional instance keys, stable across re-renders
+        const occ = {};
         placeholders.forEach((placeholder) => {
           const name = placeholder.getAttribute("name");
-          const factory = registry[name] || (containerComp.__OLUM__.components && containerComp.__OLUM__.components[name]);
+          const factory =
+            registry[name] ||
+            (containerComp.__OLUM__.components &&
+              containerComp.__OLUM__.components[name]);
           if (!factory) {
-            console.warn("olum: couldn't find " + name + " Component while building the tree!");
+            console.warn(
+              "olum: couldn't find " +
+                name +
+                " Component while building the tree!",
+            );
             return;
           }
+
           const keyVal = placeholder.getAttribute("data-o-key");
           let instanceKey;
           if (keyVal !== null && keyVal !== "") {
@@ -333,39 +484,52 @@ export default (function () {
           }
 
           const propsJson = placeholder.getAttribute("data-o-props");
-          const incomingProps = propsJson ? JSON.parse(decodeURIComponent(propsJson)) : {};
+          const incomingProps = propsJson
+            ? JSON.parse(decodeURIComponent(propsJson))
+            : {};
           const incomingPropSources = {};
           const srcStr = placeholder.getAttribute("data-o-props-src") || "";
           if (srcStr)
             srcStr.split("|").forEach((pair) => {
-              const parts = pair.split(":"); // propKey:kind:srcKey
+              const parts = pair.split(":");
               const propKey = parts[0],
                 kind = parts[1],
                 srcKey = parts[2];
-              if (propKey && kind && srcKey) incomingPropSources[propKey] = { kind, key: srcKey };
+              if (propKey && kind && srcKey)
+                incomingPropSources[propKey] = { kind, key: srcKey };
             });
+
           Object.keys(incomingPropSources).forEach((propKey) => {
             const desc = incomingPropSources[propKey];
             if (desc.kind === "method") {
-              const fn = containerComp.methodsRef && containerComp.methodsRef[desc.key];
+              const fn =
+                containerComp.methodsRef && containerComp.methodsRef[desc.key];
               if (typeof fn === "function") incomingProps[propKey] = fn;
-            } else if (desc.kind === "props" && incomingProps[propKey] === undefined) {
-              const val = containerComp.incomingProps && containerComp.incomingProps[desc.key];
+            } else if (
+              desc.kind === "props" &&
+              incomingProps[propKey] === undefined
+            ) {
+              const val =
+                containerComp.incomingProps &&
+                containerComp.incomingProps[desc.key];
               if (typeof val === "function") incomingProps[propKey] = val;
             }
           });
-          // slot/children — must be set before getElm so ${children} resolves in the child's template
+
           const childrenHtml = placeholder.innerHTML.trim();
 
-          // reuse the instance from a previous render (preserves its state) or mint a fresh one
           let child = store[instanceKey];
           if (!child) {
-            store[instanceKey] = { parentCompName: containerKey, incomingProps, incomingPropSources, children: childrenHtml };
+            store[instanceKey] = {
+              parentCompName: containerKey,
+              incomingProps,
+              incomingPropSources,
+              children: childrenHtml,
+            };
             const created = factory(instanceKey);
-            Object.assign(store[instanceKey], created); // merge el/__OLUM__/hooks/stateProps
+            Object.assign(store[instanceKey], created);
             child = store[instanceKey];
           } else {
-            // existing instance (re-render): refresh props/children, keep its state
             child.parentCompName = containerKey;
             child.incomingProps = incomingProps;
             child.incomingPropSources = incomingPropSources;
@@ -376,9 +540,15 @@ export default (function () {
           const elm = child.__OLUM__.getElm;
           self.__renderingKey = null;
           if (elm) {
-            elm.setAttribute("data-o-if", placeholder.getAttribute("if") ? placeholder.getAttribute("if") : "olum-no-condition"); // display if condition value (truthy, falsy)
+            elm.__olumKey = instanceKey;
+            elm.setAttribute(
+              "data-o-if",
+              placeholder.getAttribute("if")
+                ? placeholder.getAttribute("if")
+                : "olum-no-condition",
+            );
             placeholder.replaceWith(elm);
-            renderChildren(child, instanceKey, elm); // recurse into this child's own subtree
+            renderChildren(child, instanceKey, elm);
           }
         });
       }
@@ -391,21 +561,22 @@ export default (function () {
       const map = window.olum.app.map;
       if (map) {
         map.find((obj) => {
-          if (obj.name == entry) obj.children.forEach((child) => comps.push(child));
+          if (obj.name == entry)
+            obj.children.forEach((child) => comps.push(child));
         });
       }
 
       function recursive(num) {
         const child = comps[num];
         map.forEach((obj) => {
-          if (obj.name == child) obj.children.forEach((item) => comps.push(item));
+          if (obj.name == child)
+            obj.children.forEach((item) => comps.push(item));
         });
         if (num + 1 <= comps.length) recursive(num + 1);
       }
 
       if (comps.length) recursive(0);
 
-      // console.warn("innerComps: ", comps);
       return comps;
     },
   };
@@ -421,12 +592,14 @@ export default (function () {
 
     use(comp) {
       if (comp) {
-        const isRouter = typeof comp?.name === "function" && comp.name() === "Router";
-        const isComponent = typeof comp?.name == "string" && comp.name === "default";
+        const isRouter =
+          typeof comp?.name === "function" && comp.name() === "Router";
+        const isComponent =
+          typeof comp?.name == "string" && comp.name === "default";
         if (isRouter) {
           this.useRouter(comp);
         } else if (isComponent) {
-          this.useComponent(comp)
+          this.useComponent(comp);
         } else {
           throw new Error("Can't mount, Missing component or router @use()");
         }
@@ -434,7 +607,6 @@ export default (function () {
     }
 
     useRouter(router) {
-      // share props/methods with router
       window.olum.router = {
         pathname: router.pathname,
         push: router.push,
@@ -442,7 +614,7 @@ export default (function () {
         back: router.back,
         forward: router.forward,
         go: router.go,
-        extractParams: router.extractParams
+        extractParams: router.extractParams,
       };
       router.__proto__.rootElm = this.root;
       router.render = (view) => this.useComponent(view);
@@ -455,25 +627,24 @@ export default (function () {
       const tree = window.olum.buildTree(entry, store, rootKey);
       if (!tree) return console.warn("olum: couldn't build tree!");
 
-      this.setupListeners(store); // unmounted hook & state system
+      this.setupListeners(store);
 
-      this.root.innerHTML = ""; // clear any previously mounted view (router navigation)
-      this.root.append(tree); // bind full comps tree
-      // handle mounted hook
+      this.root.innerHTML = "";
+      this.root.append(tree);
+
       if (entry.hooks.mounted) {
-        const onMount = entry.hooks.mounted; // force mounting parent component (entry point comp) regardless of the data-o-if value
+        const onMount = entry.hooks.mounted;
         const onTeardown = onMount();
         entry.hooks.unMounted = onTeardown;
       }
       entry.hooks.isMounted = true;
-      // mount every instance created during buildTree (keyed by runtime instance key)
+
       Object.keys(store).forEach((key) => {
         if (key === rootKey) return;
         const c = store[key];
         if (!c || !c.el) return;
         const ifConValue = c.el.getAttribute("data-o-if");
         if (!ifConValue) {
-          // don't render comp because it has falsy value
         } else {
           if (["olum-no-condition", "true"].includes(ifConValue)) {
             if (c.hooks.mounted) {
@@ -487,92 +658,99 @@ export default (function () {
       });
     }
 
-    getPath(el, root) {
-      const path = [];
-      let cur = el;
-      while (cur && cur !== root) {
-        const parent = cur.parentElement;
-        if (!parent) break;
-        const siblings = Array.from(parent.children).filter((c) => c.tagName === cur.tagName);
-        path.unshift({ tag: cur.tagName, index: siblings.indexOf(cur) });
-        cur = parent;
-      }
-      return path;
-    }
-
-    findByPath(root, path) {
-      let cur = root;
-      for (const step of path) {
-        const siblings = Array.from(cur.children).filter((c) => c.tagName === step.tag);
-        cur = siblings[step.index];
-        if (!cur) return null;
-      }
-      return cur;
-    }
-
     setupListeners(store) {
       const mkHash = window.olum.mkHash;
 
-      window.addEventListener("updateOlumComp", (e) => {
-        if (e && e.detail && e.detail.compName && e.detail.compId && e.detail.hash) {
-          if (e.detail.hash !== mkHash(e.detail.compName + e.detail.compId)) return;
-          const comp = store[e.detail.compName];
-          if (!comp || !comp.el) return;
-          if (!document.body.contains(comp.el)) return; // comp was unmounted; ignore stale state updates
+      const pending = new Map();
+      let scheduled = false;
 
-          const compName = e.detail.compName;
+      const rebuild = (compName) => {
+        const comp = store[compName];
+        if (!comp || !comp.el) return;
+        if (!document.body.contains(comp.el)) return;
 
-          const innerNames = Object.keys(store).filter((name) => name !== compName);
-          const prevMounted = {};
-          innerNames.forEach((name) => {
-            const c = store[name];
-            if (c) prevMounted[name] = c.hooks.isMounted;
-          });
+        const innerNames = Object.keys(store).filter(
+          (name) => name !== compName,
+        );
+        const prevMounted = {};
+        innerNames.forEach((name) => {
+          const c = store[name];
+          if (c) prevMounted[name] = c.hooks.isMounted;
+        });
 
-          // get current active element location/path before re-render (buildTree)
-          const activeEl = document.activeElement;
-          const selStart = activeEl && activeEl.selectionStart != null ? activeEl.selectionStart : null;
-          const selEnd = activeEl && activeEl.selectionEnd != null ? activeEl.selectionEnd : null;
-          const activePath = activeEl && comp.el.contains(activeEl) ? this.getPath(activeEl, comp.el) : null;
+        const treeElm = window.olum.buildTree(comp, store, compName);
+        if (!treeElm) return console.warn("olum: couldn't build tree!");
 
-          const treeElm = window.olum.buildTree(comp, store, compName);
-          if (!treeElm) return console.warn("olum: couldn't build tree!");
-          comp.el.replaceWith(treeElm);
+        if (treeElm !== comp.el) window.olum.vdom.patch(comp.el, treeElm);
 
-          // load prev active element after re-render (buildTree) to focus (e.g. input) or restore its data (e.g. forms)
-          if (activePath && activePath.length) {
-            const toRestore = this.findByPath(treeElm, activePath);
-            if (toRestore) {
-              if (toRestore.focus && typeof toRestore.focus == "function") toRestore.focus();
-              if (selStart !== null && toRestore.setSelectionRange && typeof toRestore.setSelectionRange == "function")
-                toRestore.setSelectionRange(selStart, selEnd);
+        const afterNames = Object.keys(store).filter(
+          (name) => name !== compName,
+        );
+        afterNames.forEach((name) => {
+          const c = store[name];
+          if (!c) return;
+          const isInDOM = document.body.contains(c.el);
+          if (prevMounted[name] && !isInDOM) {
+            if (c.hooks.unMounted && !c.hooks.isUnMounted) {
+              const onTeardown = c.hooks.unMounted;
+              c.hooks.isUnMounted = true;
+              c.hooks.isMounted = false;
+              if (onTeardown && typeof onTeardown === "function") onTeardown();
+            }
+          } else if (!prevMounted[name] && isInDOM) {
+            if (c.hooks.mounted && !c.hooks.isMounted) {
+              const onMount = c.hooks.mounted;
+              c.hooks.isMounted = true;
+              c.hooks.isUnMounted = false;
+              const onTeardown = onMount();
+              c.hooks.unMounted = onTeardown;
             }
           }
+        });
+      };
 
-          const afterNames = Object.keys(store).filter((name) => name !== compName);
-          afterNames.forEach((name) => {
-            const c = store[name];
-            if (!c) return;
-            const isInDOM = document.body.contains(c.el);
-            if (prevMounted[name] && !isInDOM) {
-              // was mounted, now removed from DOM → unMounted
-              if (c.hooks.unMounted && !c.hooks.isUnMounted) {
-                const onTeardown = c.hooks.unMounted;
-                c.hooks.isUnMounted = true;
-                c.hooks.isMounted = false;
-                if (onTeardown && typeof onTeardown === "function") onTeardown();
-              }
-            } else if (!prevMounted[name] && isInDOM) {
-              // was not mounted, now in DOM → mounted
-              if (c.hooks.mounted && !c.hooks.isMounted) {
-                const onMount = c.hooks.mounted;
-                c.hooks.isMounted = true;
-                c.hooks.isUnMounted = false;
-                const onTeardown = onMount();
-                c.hooks.unMounted = onTeardown;
-              }
-            }
-          });
+      const flush = () => {
+        scheduled = false;
+        if (!pending.size) return;
+        const names = Array.from(pending.keys());
+        pending.clear();
+        names.forEach((name) => {
+          const covered = names.some(
+            (other) => other !== name && name.indexOf(other + ">") === 0,
+          );
+          if (!covered) rebuild(name);
+        });
+      };
+
+      window.olum.flushUpdates = flush;
+
+      window.addEventListener("updateOlumComp", (e) => {
+        if (
+          e &&
+          e.detail &&
+          e.detail.compName &&
+          e.detail.compId &&
+          e.detail.hash
+        ) {
+          if (e.detail.hash !== mkHash(e.detail.compName + e.detail.compId))
+            return;
+          const comp = store[e.detail.compName];
+          if (!comp || !comp.el) return;
+          if (!document.body.contains(comp.el)) return;
+
+          const deps = comp.__OLUM__ && comp.__OLUM__.deps;
+          if (
+            deps &&
+            typeof e.detail.key === "string" &&
+            deps.indexOf(e.detail.key) === -1
+          )
+            return;
+
+          pending.set(e.detail.compName, true);
+          if (!scheduled) {
+            scheduled = true;
+            Promise.resolve().then(flush);
+          }
         }
       });
     }
@@ -581,7 +759,7 @@ export default (function () {
       const store = {};
       const rootKey = entry.__OLUM__.compName;
       store[rootKey] = entry;
-      Object.assign(window.olum.app, { store, registry: {} }); // this is a must to access live changes
+      Object.assign(window.olum.app, { store, registry: {} });
       return { store, rootKey };
     }
   }
@@ -589,20 +767,37 @@ export default (function () {
   return Olum;
 })();
 
-export const onMount = (cb) => cb
-export const params = (path, pathname) => window.olum.router.extractParams(path, pathname);
+export const onMount = (cb) => cb;
+
+export const crossfade = (opts) => window.olum.transition.crossfade(opts);
+export const easings =
+  typeof window !== "undefined" && window.olum ? window.olum.easings : {};
+export const transitions =
+  typeof window !== "undefined" && window.olum ? window.olum.transitions : {};
+export const params = (path, pathname) =>
+  window.olum.router.extractParams(path, pathname);
 export const push = (path) => window.olum.router.push(path);
 export const replace = (path) => window.olum.router.replace(path);
 export const back = () => window.olum.router.back();
 export const pathname = () => window.olum.router.pathname();
 export const forward = () => window.olum.router.forward();
 export const go = (n) => window.olum.router.go(n);
+
 export const props = (storeKey) => window.olum.props(storeKey);
+
 export const store = (init) => {
-  if (!window.olum.store) throw new Error("olum: store is unavailable — the store module (./store.js / olum-store package) is not installed");
+  if (!window.olum.store)
+    throw new Error(
+      "olum: store is unavailable — the store module (./store.js / olum-store package) is not installed",
+    );
   return window.olum.store(init);
 };
-if (typeof window !== "undefined") await import("olum-store").then((m) => (window.olum.store = m.default(window.olum))).catch(() => {});
+
+if (typeof window !== "undefined")
+  await import("olum-store")
+    .then((m) => (window.olum.store = m.default(window.olum)))
+    .catch(() => {});
+
 export const scope = (name, index = 0) => {
   const entries = (window.olum.app && window.olum.app.store) || {};
   const matches = Object.keys(entries).filter((key) => {
@@ -611,7 +806,9 @@ export const scope = (name, index = 0) => {
   });
   const key = matches[index];
   if (!key) {
-    console.warn('olum: scope("' + name + '") — no mounted component matches that name');
+    console.warn(
+      'olum: scope("' + name + '") — no mounted component matches that name',
+    );
     return null;
   }
   const entry = entries[key];

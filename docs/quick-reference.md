@@ -48,6 +48,20 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <!-- SHOW -->
 <show when="state.visible">…</show>
 
+<!-- DEBUG -->
+<log>{state.user}</log>          <!-- console.log(state.user) on mount + each time user changes; renders nothing -->
+
+<!-- TRANSITIONS (enter/leave animation; works on <if>/<show> toggles AND keyed <for> items) -->
+<if when="state.visible">
+  <transition transition="fade">              <!-- same in+out; built-ins: fade/fly/scale/slide/draw -->
+    <p>fades in and out</p>
+  </transition>
+</if>
+<transition in="fly({ y: 200 })" out="fade"><p>…</p></transition>  <!-- separate in/out + params -->
+<transition flip="{ duration: 300 }"><li>…</li></transition>       <!-- animate to new spot on keyed reorder -->
+<!-- crossfade: const _cf = crossfade({ fallback: transitions.scale }); const send=(n,p)=>_cf[0](n,p); receive=… -->
+<transition in="receive({ key: id })" out="send({ key: id })" flip><li>…</li></transition>  <!-- fly between two keyed lists -->
+
 <!-- LOOPS -->
 <for each="item of state.items" key="item.id"><Row item="{item}" /></for>
 <for each="i of 6">{i}</for>
