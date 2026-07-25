@@ -1,6 +1,15 @@
-import transition from "./transition.js";
-
 const vdom = {
+  transition: {
+    remove(parent, node) {
+      parent.removeChild(node);
+    },
+    sync() {},
+    primeIntros() {},
+    flipCapture() {
+      return null;
+    },
+    flipPlay() {},
+  },
   mkStaging(el) {
     const s = document.createElement(el.tagName);
     const meta = el.getAttribute("data-olum");
@@ -113,7 +122,7 @@ const vdom = {
 
     this.syncAttrs(oldN, newN);
     this.syncEvents(oldN, newN);
-    transition.sync(oldN, newN);
+    this.transition.sync(oldN, newN);
 
     if (tag === "INPUT") {
       if (valueChanged)
@@ -241,8 +250,7 @@ const vdom = {
       if (aheadMatch) {
         while (oldKid !== aheadMatch) {
           const nx = oldKid.nextSibling;
-
-          transition.remove(oldParent, oldKid);
+          this.transition.remove(oldParent, oldKid);
           oldKid = nx;
         }
         this.patchNode(oldKid, newKid);
@@ -258,19 +266,18 @@ const vdom = {
 
     while (oldKid) {
       const next = oldKid.nextSibling;
-
-      transition.remove(oldParent, oldKid);
+      this.transition.remove(oldParent, oldKid);
       oldKid = next;
     }
   },
 
   patch(liveEl, stagedEl) {
     try {
-      const flips = transition.flipCapture(liveEl);
+      const flips = this.transition.flipCapture(liveEl);
       this.patchNode(liveEl, stagedEl);
 
-      transition.primeIntros(liveEl);
-      if (flips) transition.flipPlay(flips);
+      this.transition.primeIntros(liveEl);
+      if (flips) this.transition.flipPlay(flips);
       return true;
     } catch (err) {
       console.warn("olum: patch failed — falling back to full re-render", err);

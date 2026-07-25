@@ -7,8 +7,6 @@
 */
 import vdom from "./vdom.js";
 
-import transition from "./transition.js";
-
 export default (function () {
   var olum = {
     version: "0.8.0",
@@ -368,6 +366,16 @@ export default (function () {
         const raw = olum.clean(node.getAttribute("data-o-trans"));
         if (!raw) return;
         node.removeAttribute("data-o-trans");
+
+        if (!olum.transition) {
+          if (!olum._transWarned) {
+            olum._transWarned = true;
+            console.warn(
+              "olum: <transition> used but the transition module (./transition.js / olum-transition package) is not installed — animations are disabled. npm i olum-transition",
+            );
+          }
+          return;
+        }
         node.__olumTrans = parseDefs(raw);
 
         if (node.__olumTrans.flip !== undefined) {
@@ -383,7 +391,7 @@ export default (function () {
           typeof requestAnimationFrame === "function"
             ? requestAnimationFrame
             : (cb) => setTimeout(cb, 16);
-        raf(() => transition.playIntro(node));
+        raf(() => olum.transition.playIntro(node));
       });
     },
     isObj(obj) {
@@ -425,11 +433,23 @@ export default (function () {
 
     vdom: vdom,
 
-    transitions: transition.transitions,
-    easings: transition.easings,
-    transition: transition,
+    transitions: {},
+    easings: {},
+    transition: null,
+    useTransition(t) {
+      this.transition = t;
+      this.vdom.transition = t;
+      Object.assign(this.transitions, t.transitions);
+      Object.assign(this.easings, t.easings);
+    },
 
-    crossfade: transition.crossfade,
+    crossfade(opts) {
+      if (!this.transition)
+        throw new Error(
+          "olum: crossfade is unavailable — the transition module (./transition.js / olum-transition package) is not installed",
+        );
+      return this.transition.crossfade(opts);
+    },
 
     directOlums(container) {
       return Array.prototype.slice
@@ -769,7 +789,7 @@ export default (function () {
 
 export const onMount = (cb) => cb;
 
-export const crossfade = (opts) => window.olum.transition.crossfade(opts);
+export const crossfade = (opts) => window.olum.crossfade(opts);
 export const easings =
   typeof window !== "undefined" && window.olum ? window.olum.easings : {};
 export const transitions =
@@ -796,6 +816,11 @@ export const store = (init) => {
 if (typeof window !== "undefined")
   await import("olum-store")
     .then((m) => (window.olum.store = m.default(window.olum)))
+    .catch(() => {});
+
+if (typeof window !== "undefined")
+  await import("olum-transition")
+    .then((m) => window.olum.useTransition(m.default))
     .catch(() => {});
 
 export const scope = (name, index = 0) => {

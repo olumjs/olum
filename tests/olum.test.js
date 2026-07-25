@@ -60,6 +60,7 @@ function load() {
       .replace(/^\s*export\s+default\s+/m, "const __OlumClass = ")
       .replace(/^\s*export\s+const\s+/gm, "const ");
   src += "\nwindow.olum.store = createStore(window.olum);";
+  src += "\nwindow.olum.useTransition(transition);";
 
   src += "\n;return { Olum: __OlumClass, onMount: onMount, props: props };";
   const exported = new Function(src)();
