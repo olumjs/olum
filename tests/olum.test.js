@@ -17,19 +17,19 @@ const PASS_ICON = green("✔");
 const FAIL_ICON = red("✖");
 
 const OLUM_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/olum.js"),
+  path.join(__dirname, "../src/olum.js"),
   "utf8",
 );
 const VDOM_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/vdom.js"),
+  path.join(__dirname, "../src/vdom.js"),
   "utf8",
 );
 const STORE_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/store.js"),
+  path.join(__dirname, "../src/store.js"),
   "utf8",
 );
 const TRANSITION_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/transition.js"),
+  path.join(__dirname, "../src/transition.js"),
   "utf8",
 );
 function load() {

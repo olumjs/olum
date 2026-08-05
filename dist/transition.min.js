@@ -1,6 +1,6 @@
 /**
 * @name olum
-* @version 0.9.1
+* @version 0.9.2
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT

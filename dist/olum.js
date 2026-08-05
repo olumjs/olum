@@ -1,6 +1,6 @@
 /**
 * @name olum
-* @version 0.9.1
+* @version 0.9.2
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
@@ -519,19 +519,20 @@ export default (function () {
                 incomingPropSources[propKey] = { kind, key: srcKey };
             });
 
+          const ownerKey = placeholder.getAttribute("data-o-props-owner");
+          const ownerComp = (ownerKey && store[ownerKey]) || containerComp;
+
           Object.keys(incomingPropSources).forEach((propKey) => {
             const desc = incomingPropSources[propKey];
             if (desc.kind === "method") {
-              const fn =
-                containerComp.methodsRef && containerComp.methodsRef[desc.key];
+              const fn = ownerComp.methodsRef && ownerComp.methodsRef[desc.key];
               if (typeof fn === "function") incomingProps[propKey] = fn;
             } else if (
               desc.kind === "props" &&
               incomingProps[propKey] === undefined
             ) {
               const val =
-                containerComp.incomingProps &&
-                containerComp.incomingProps[desc.key];
+                ownerComp.incomingProps && ownerComp.incomingProps[desc.key];
               if (typeof val === "function") incomingProps[propKey] = val;
             }
           });
