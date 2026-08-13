@@ -58,7 +58,7 @@ Re-assigning the **same reference** back (`state.todos = state.todos`) is a no-o
 
 ## Re-renders are batched
 
-[Watchers](/docs/watchers) fire **synchronously, once per mutation**, but **re-renders are batched per microtask**: `state.a++; state.b++` — or an in-place `splice` that shifts many elements — costs a **single** re-render pass, and that pass [patches the DOM in place](/docs/limitations) rather than rebuilding it. Mutate `state` however reads best — including big arrays with `push`/`splice`; there's no perf reason to reach for reassignment or the store.
+[Watchers](/docs/watchers) fire **synchronously, once per mutation**, but **re-renders are batched per microtask**: `state.a++; state.b++` — or an in-place `splice` that shifts many elements — costs a **single** re-render pass, and that pass [patches the DOM in place](/docs/rendering) rather than rebuilding it. Mutate `state` however reads best — including big arrays with `push`/`splice`; there's no perf reason to reach for reassignment or the store.
 
 One consequence: the DOM is **not** updated in the same statement as the write. Code that must read the freshly-rendered DOM immediately after a write can settle pending re-renders explicitly:
 
@@ -67,6 +67,8 @@ state.count++;
 window.olum.flushUpdates();          // settle re-renders NOW (mostly useful in tests)
 host.querySelector("span").textContent; // fresh
 ```
+
+A write to a key the template never reads doesn't schedule a render at all — see [Rendering & Updates](/docs/rendering) for the full update cycle and what survives a patch.
 
 ## Declare `state` literally
 

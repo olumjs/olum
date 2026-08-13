@@ -25,11 +25,12 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <!-- ASSET URLS (root-absolute, served from public/) -->
 <img src="/assets/logo.svg" />
 
-<!-- EVENTS (code in "", ONE on* attribute per element) -->
+<!-- EVENTS (code in "") -->
 <button onclick="save()">Save</button>
 <input oninput="(e)=> state.text = e.target.value" />
 <input oninput="setValue($event)" />
 <form onsubmit="(e)=> { e.preventDefault(); submit() }"></form>
+<input oninput="draft($event)" onblur="save()" />   <!-- several on* attributes on one element are fine -->
 
 <!-- FORM BINDINGS (manual two-way) -->
 <input value="{state.text}" oninput="(e)=> state.text = e.target.value" />

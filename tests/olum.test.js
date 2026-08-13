@@ -17,19 +17,19 @@ const PASS_ICON = green("✔");
 const FAIL_ICON = red("✖");
 
 const OLUM_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/olum.js"),
+  path.join(__dirname, "../core/olum.js"),
   "utf8",
 );
 const VDOM_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/vdom.js"),
+  path.join(__dirname, "../core/vdom.js"),
   "utf8",
 );
 const STORE_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/store.js"),
+  path.join(__dirname, "../core/store.js"),
   "utf8",
 );
 const TRANSITION_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/transition.js"),
+  path.join(__dirname, "../core/transition.js"),
   "utf8",
 );
 function load() {
@@ -62,7 +62,8 @@ function load() {
   src += "\nwindow.olum.store = createStore(window.olum);";
   src += "\nwindow.olum.useTransition(transition);";
 
-  src += "\n;return { Olum: __OlumClass, onMount: onMount, props: props };";
+  src +=
+    "\n;return { Olum: __OlumClass, onMount: onMount, props: props, scope: scope };";
   const exported = new Function(src)();
   return {
     window: dom.window,
@@ -491,6 +492,63 @@ check("an <olum> placeholder is replaced by the child's element", () => {
   );
 });
 
+function slotOwnerTree(withOwner) {
+  const { window, document } = load();
+  const store = {};
+  const pick = () => "picked";
+
+  const cardElm = document.createElement("b");
+  const cardFactory = () => ({
+    __OLUM__: { compName: "Card", getElm: cardElm, components: {} },
+    methodsRef: {},
+    hooks: {},
+  });
+
+  const sectionElm = document.createElement("section");
+  sectionElm.innerHTML =
+    `<olum name="Card" data-o-props-src="onPick:method:pick"` +
+    (withOwner ? ` data-o-props-owner="App"` : ``) +
+    `></olum>`;
+  const sectionFactory = () => ({
+    __OLUM__: {
+      compName: "Section",
+      getElm: sectionElm,
+      components: { Card: cardFactory },
+    },
+    methodsRef: {},
+    hooks: {},
+  });
+
+  const app = makeComp(`<olum name="Section"></olum>`, {
+    Section: sectionFactory,
+  });
+  app.methodsRef = { pick };
+  store.App = app;
+  window.olum.app.store = store;
+  window.olum.app.registry = {};
+  window.olum.buildTree(app, store, "App");
+  return { store, pick };
+}
+
+check(
+  "a function prop authored in another component's slot resolves against the AUTHOR",
+  () => {
+    const { store, pick } = slotOwnerTree(true);
+    const card = store["App>Section#0>Card#0"];
+    return !!card && card.incomingProps.onPick === pick;
+  },
+);
+
+check(
+  "without data-o-props-owner the prop resolves against the container (nothing to find)",
+  () => {
+    const { store } = slotOwnerTree(false);
+    const card = store["App>Section#0>Card#0"];
+
+    return !!card && card.incomingProps.onPick === undefined;
+  },
+);
+
 check("a missing child factory warns and leaves the placeholder", () => {
   const { window } = load();
   const comp = makeComp(`<olum name="Ghost"></olum>`);
@@ -678,6 +736,72 @@ check("props export delegates to window.olum.props", () => {
   return props("c").k === 1;
 });
 
+section("§17 scope()");
+
+function scopeEnv() {
+  const env = load();
+  const mk = (name) => {
+    const el = env.document.createElement("div");
+    el.setAttribute("data-name", name);
+    return {
+      el,
+      stateProps: { who: name },
+      props: { p: name },
+      methods: { m: () => name },
+    };
+  };
+  env.window.olum.app.store = {
+    page: mk("page"),
+    "page>Item#0": mk("first"),
+    "page>Item#1": mk("second"),
+    "page>Card@7": mk("keyed"),
+  };
+  return env;
+}
+
+check(
+  "returns the mounted instance's surface: key, el, state, props, methods",
+  () => {
+    const env = scopeEnv();
+    const s = env.scope("Item");
+    const entry = env.window.olum.app.store["page>Item#0"];
+    return (
+      s.key === "page>Item#0" &&
+      s.el === entry.el &&
+      s.state === entry.stateProps &&
+      s.props === entry.props &&
+      s.methods === entry.methods
+    );
+  },
+);
+
+check("the index argument picks the Nth mounted instance", () => {
+  const env = scopeEnv();
+  return (
+    env.scope("Item", 1).state.who === "second" &&
+    env.scope("Item", 0).state.who === "first"
+  );
+});
+
+check("a keyed instance (@key suffix) is matched by name too", () => {
+  const env = scopeEnv();
+  return env.scope("Card").key === "page>Card@7";
+});
+
+check("no match returns null and warns", () => {
+  const env = scopeEnv();
+  let warned = false;
+  const origWarn = console.warn;
+  console.warn = () => (warned = true);
+  let result;
+  try {
+    result = env.scope("Ghost");
+  } finally {
+    console.warn = origWarn;
+  }
+  return result === null && warned;
+});
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -695,7 +819,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 58;
+const EXPECTED_CHECKS = 64;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(

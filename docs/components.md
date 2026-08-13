@@ -142,6 +142,21 @@ Forwarding through a middle component is just passing the prop along:
 <Inner onMessage="{onMessage}" />
 ```
 
+A function prop also survives being written inside **another component's slot** — the handler is resolved against the component whose template contains the tag, not the one that happens to render it:
+
+```html title="Page.html"
+<script>
+  import Section from "./Section";
+  import Card from "./Card";
+  const pick = (id) => (state.picked = id);
+</script>
+
+<!-- Card is authored here but instantiated during Section's render — `pick` still arrives -->
+<Section>
+  <Card onPick="{pick}" />
+</Section>
+```
+
 :::note
 On a **component** tag, an `on*` name is just a prop like any other — even `onclick`. `<CustomButton onclick="{handleClick}" />` hands the child a function; the child decides when to call it (e.g. from its own `<button onclick="onclick()">`). Only on plain elements is `on*` a real DOM event.
 :::

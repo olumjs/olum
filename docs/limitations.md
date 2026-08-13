@@ -7,7 +7,8 @@ order: 220
 OlumJS is deliberately small, and a few rough edges come with that. Here's what to watch for today — each has a straightforward workaround by design.
 
 ## 1. Unkeyed loop reorders match nodes by position
- An unkeyed `<for>` matches nodes by position. If a loop reorders its items, positional matching repaints each node in place with a neighbour's data, so the node's live state appears to jump to the wrong row. Add [`key`](/docs/loops) and nodes are matched by identity and moved instead.
+
+An unkeyed `<for>` matches nodes by position. If a loop reorders its items, positional matching repaints each node in place with a neighbour's data, so the node's live state appears to jump to the wrong row. Add [`key`](/docs/loops) and nodes are matched by identity and moved instead — see [Rendering & Updates](/docs/rendering).
 
 ## 2. No element refs or actions
 
@@ -31,7 +32,7 @@ using `host` to reach this component's own elements, and return a cleanup:
 <button>press and hold</button>
 ```
 
-`onMount` runs once at mount and its cleanup once at unmount — it does **not** re-run on state changes. Because re-renders patch in place (limitation #1), the element you wired stays the same node, so the behavior keeps working. If it needs to react to new state, read that state inside the action's own handlers.
+`onMount` runs once at mount and its cleanup once at unmount — it does **not** re-run on state changes. Because re-renders [patch in place](/docs/rendering), the element you wired stays the same node, so the behavior keeps working. If it needs to react to new state, read that state inside the action's own handlers.
 
 ## 3. No special elements (`window` / `document` / `body`)
 

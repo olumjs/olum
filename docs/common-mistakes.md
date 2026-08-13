@@ -34,7 +34,7 @@ OlumJS intentionally has **no naked braces** and **one way** to do each thing. T
 | `const { a, b = a } = props()` | give `b` a self-contained default | a default referencing another destructured prop reads its stale value |
 | `const { color } = props(); color = "x"` | `const { onChange } = props(); onChange("x")` | props are read-only — assigning throws (const); change values through a callback prop |
 | `url(assets/x.svg)` / `src="assets/…"` | `url(/assets/x.svg)` — leading `/` | asset URLs are root-absolute ([why](/docs/static-assets)) |
-| `oninput="…" onblur="…"` on one element | one handler, extras via `onMount` | one `on*` attribute per element ([events](/docs/events)) |
+| `oninput="…" onblur="…"` on one element | works as-is | several `on*` attributes per element are fine ([events](/docs/events)) |
 | `each="i of state.n"` | `each="i of Array.from({length: state.n}, (_, k) => k + 1)"` | numeric range needs a literal number |
 | two `onMount(…)` calls | one call, one combined cleanup | only the first call is wired |
 | `params()` called twice | destructure once at top level | only the first call is compiled |

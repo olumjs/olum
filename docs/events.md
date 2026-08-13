@@ -26,25 +26,19 @@ Pass the DOM event with `$event`:
 Event modifiers (`mode="prevent"`, `stop`, …) are **not** a feature — do it in the handler: `onsubmit="(e)=> { e.preventDefault(); save() }"`.
 :::
 
-## One event attribute per element
+## Several events on one element
 
-An element can carry **one** `on*` attribute. If you write several, only one survives — combine the logic into a single handler, or attach extra listeners imperatively in [`onMount`](/docs/lifecycle):
+An element can carry as many `on*` attributes as you need — each is wired as its own listener:
 
 ```html title="Component.html"
-<!-- ✗ two on* attributes — one is silently dropped -->
-<input oninput="draft($event)" onblur="save()" />
+<input oninput="draft($event)" onblur="save()" onkeydown="hotkey($event)" />
 
-<!-- ✓ one on* attribute; the second listener is attached in onMount -->
-<script>
-  import { onMount } from "olum";
-  onMount(() => {
-    const input = host.querySelector("input");
-    input.addEventListener("blur", save);
-    return () => input.removeEventListener("blur", save);
-  });
-</script>
-<input oninput="draft($event)" />
+<div onmousedown="startDrag($event)" onmousemove="drag($event)" onmouseup="endDrag()">
+  drag me
+</div>
 ```
+
+Across re-renders a listener is **kept** as long as its binding is unchanged; it's only swapped when the handler — or a value baked into it, like a loop variable — actually changes. Reach for [`onMount`](/docs/lifecycle) only for listeners that aren't on one of your own elements (`window`, `document`) or that need options like `capture` / `passive`.
 
 ## Loop variables just work
 
