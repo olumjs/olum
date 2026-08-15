@@ -802,6 +802,119 @@ check("no match returns null and warns", () => {
   return result === null && warned;
 });
 
+section("§18 use() mount dispatch");
+
+function mountable(document) {
+  const el = document.createElement("div");
+  el.innerHTML = `<span>hi</span>`;
+  return () => ({
+    __OLUM__: { compName: "App", getElm: el, components: {} },
+    methodsRef: {},
+    props: {},
+    methods: {},
+    hooks: {
+      mounted: null,
+      unMounted: null,
+      isMounted: false,
+      isUnMounted: false,
+    },
+  });
+}
+
+function mount(factory) {
+  const { Olum, window, document } = load();
+  document.body.innerHTML = `<div id="app"></div>`;
+  new Olum().$("#app").use(factory);
+  return window.document.querySelector("#app").innerHTML;
+}
+
+check(
+  "a named component factory mounts (bundled build: name is the module's local name)",
+  () => {
+    const { document } = load();
+    const page = mountable(document);
+    return mount(page).includes("hi");
+  },
+);
+
+check(
+  "an anonymous component factory mounts (bundled build: export inlined at the call site)",
+  () => {
+    const { document } = load();
+    const factory = mountable(document);
+    return mount((...args) => factory(...args)).includes("hi");
+  },
+);
+
+check("a router instance still takes the router branch", () => {
+  const { Olum, document } = load();
+  document.body.innerHTML = `<div id="app"></div>`;
+  let listened = false;
+  const router = {
+    name: () => "Router",
+    isReady: true,
+    listen: () => (listened = true),
+    pathname: () => "/",
+  };
+  router.__proto__ = Object.create(Object.prototype);
+  new Olum().$("#app").use(router);
+  return listened && typeof router.render === "function";
+});
+
+check("a factory renamed by a minifier mounts", () => {
+  const { document } = load();
+  const factory = mountable(document);
+  const n = factory;
+  return mount(n).includes("hi");
+});
+
+check(
+  "a non-callable, non-router argument fails in useComponent, not in use()",
+  () => {
+    const { Olum, document } = load();
+    document.body.innerHTML = `<div id="app"></div>`;
+    try {
+      new Olum().$("#app").use({ nope: true });
+      return false;
+    } catch (err) {
+      return err instanceof TypeError && /is not a function/.test(err.message);
+    }
+  },
+);
+
+check(
+  "an already-invoked component (use(Page()) typo) fails loudly rather than silently",
+  () => {
+    const { Olum, document } = load();
+    document.body.innerHTML = `<div id="app"></div>`;
+    const entry = mountable(document)();
+    try {
+      new Olum().$("#app").use(entry);
+      return false;
+    } catch (err) {
+      return /is not a function/.test(err.message);
+    }
+  },
+);
+
+check(
+  "passing the Router class instead of an instance hits Router's own new-keyword guard",
+  () => {
+    const { Olum, document } = load();
+    document.body.innerHTML = `<div id="app"></div>`;
+    function Router(config) {
+      if (!(this instanceof Router))
+        throw new Error("can't invoke 'Router' without 'new' keyword");
+    }
+    try {
+      new Olum().$("#app").use(Router);
+      return false;
+    } catch (err) {
+      return /without 'new' keyword/.test(err.message);
+    }
+  },
+);
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -819,7 +932,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 64;
+const EXPECTED_CHECKS = 71;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(

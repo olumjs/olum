@@ -1,6 +1,6 @@
 /**
 * @name olum
-* @version 0.9.2
+* @version 0.9.3
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
@@ -615,14 +615,10 @@ export default (function () {
       if (comp) {
         const isRouter =
           typeof comp?.name === "function" && comp.name() === "Router";
-        const isComponent =
-          typeof comp?.name == "string" && comp.name === "default";
         if (isRouter) {
           this.useRouter(comp);
-        } else if (isComponent) {
-          this.useComponent(comp);
         } else {
-          throw new Error("Can't mount, Missing component or router @use()");
+          this.useComponent(comp);
         }
       }
     }
