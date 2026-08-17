@@ -6,6 +6,8 @@ order: 100
 
 There is no `model` attribute — every binding is the same manual pair: a **value-ish attribute** reading from state, plus an **event handler** writing back.
 
+This page is the pattern. For the full field catalog — date, color, datalist, validation, `FormData`, `contenteditable` — see [Forms & Inputs](/docs/forms).
+
 An unrelated re-render never disturbs what the user typed: the live value is only rewritten when the template's own value changed, and the caret is kept in place when it is — see [Rendering & Updates](/docs/rendering).
 
 ## Text, textarea, number

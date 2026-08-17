@@ -40,6 +40,18 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <select onchange="(e)=> state.color = e.target.value">
   <option value="red" selected="{state.color === 'red'}">red</option>  <!-- selected on option, NOT value on select -->
 </select>
+<select multiple onchange="(e)=> state.picked = Array.from(e.target.options).filter(o=>o.selected).map(o=>o.value)">…</select>
+<input type="file" multiple onchange="(e)=> state.files = e.target.files" />   <!-- FileList → Array.from() to loop -->
+<input type="date" value="{state.date}" oninput="(e)=> state.date = e.target.value" />  <!-- value is a STRING -->
+<textarea value="{state.text}" oninput="(e)=> state.text = e.target.value"></textarea>
+<div contenteditable="true" oninput="(e)=> state.title = e.target.textContent">{state.title}</div>
+
+<!-- FORM: validation + submit + FormData (see /docs/forms) -->
+<form onsubmit="(e)=> { e.preventDefault(); state.data = Object.fromEntries(new FormData(e.target)) }" onreset="reset()">
+  <input name="user" value="{state.user}" oninput="set($event)" oninvalid="(e)=> { e.preventDefault(); state.err = e.target.validationMessage }" required minlength="3" />
+  <fieldset disabled="{!state.ship}">…</fieldset>   <!-- disables every control inside -->
+  <button type="submit" value="publish">Publish</button>   <!-- e.submitter tells you which -->
+</form>
 
 <!-- CONDITIONALS -->
 <if when="state.tab === 'a'">…</if>

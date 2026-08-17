@@ -67,6 +67,35 @@ Inside `onMount`, `host` refers to this component's own root DOM element — no 
 </script>
 ```
 
+Observers and hand-wired element listeners follow the same shape — start in the callback, stop in the cleanup:
+
+```html title="Box.html"
+<script>
+  import { onMount } from "olum";
+
+  const state = { w: 0, h: 0 };
+
+  onMount(() => {
+    const box = host.querySelector(".box");
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0].contentRect;
+      state.w = Math.round(rect.width);
+      state.h = Math.round(rect.height);
+    });
+    observer.observe(box);
+
+    return () => observer.disconnect();
+  });
+</script>
+
+<p>measured: {state.w}px × {state.h}px</p>
+<div class="box">…</div>
+```
+
+The same shape covers a `<canvas>` drawing loop, a `<video>` you follow with `requestAnimationFrame` (`onplay`, `onpause` and `onloadedmetadata` also work inline — `onMount` is only needed for the loop and for state the element owns, like `video.currentTime`), and events the compiler does not know inline, such as `copy` or `paste` — see [Events](/docs/events).
+
+Working examples: [`/forms/host-element`](/forms/host-element) (canvas), [`/forms/dimensions`](/forms/dimensions) (ResizeObserver), [`/forms/media-elements`](/forms/media-elements) (a video player).
+
 :::warn
 Call `onMount` **once** per component — only the first call is wired; a second call is silently ignored. Put all setup in the one callback and return one combined cleanup.
 :::
