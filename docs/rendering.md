@@ -56,8 +56,10 @@ The patcher only writes a `value` or `checked` to a live input when the **templa
 Since rebuilds are batched, the DOM is still stale in the statement after a mutation. Settle everything pending, synchronously:
 
 ```js
+import { flushUpdates } from "olum";
+
 state.count++;
-window.olum.flushUpdates();               // run pending re-renders NOW
+flushUpdates();                           // run pending re-renders NOW
 host.querySelector("span").textContent;   // fresh
 ```
 

@@ -63,10 +63,14 @@ Re-assigning the **same reference** back (`state.todos = state.todos`) is a no-o
 One consequence: the DOM is **not** updated in the same statement as the write. Code that must read the freshly-rendered DOM immediately after a write can settle pending re-renders explicitly:
 
 ```js
+import { flushUpdates } from "olum";
+
 state.count++;
-window.olum.flushUpdates();          // settle re-renders NOW (mostly useful in tests)
+flushUpdates();                         // settle re-renders NOW (mostly useful in tests)
 host.querySelector("span").textContent; // fresh
 ```
+
+`window.olum.flushUpdates()` does the same thing, but `window.olum` exists in **development only** — a production build ships no runtime globals, so import `flushUpdates` instead.
 
 A write to a key the template never reads doesn't schedule a render at all — see [Rendering & Updates](/docs/rendering) for the full update cycle and what survives a patch.
 

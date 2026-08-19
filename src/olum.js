@@ -1,8 +1,10 @@
 import vdom from "./vdom.js";
 
+let __olumRT;
+
 export default (function () {
   var olum = {
-    version: "0.8.0",
+    version: "0.9.4",
     framework: "OlumJS",
     app: {},
 
@@ -53,7 +55,7 @@ export default (function () {
         };
         dataObj.hash = mkHash(dataObj.compName + dataObj.compId);
         if (typeof key === "string") dataObj.key = key;
-        window.olum.$emit("updateOlumComp", dataObj);
+        olum.$emit("updateOlumComp", dataObj);
       }
 
       function mkNestedHandler(rootKey) {
@@ -406,7 +408,7 @@ export default (function () {
         {},
         {
           get(_, key) {
-            const entry = window.olum.app.store[storeKey];
+            const entry = olum.app.store[storeKey];
             if (!entry) return undefined;
 
             if (key === "children") return entry.children || "";
@@ -464,8 +466,7 @@ export default (function () {
       rootElm.__olumKey = compKey;
       const self = this;
 
-      const registry =
-        window.olum.app.registry || (window.olum.app.registry = {});
+      const registry = olum.app.registry || (olum.app.registry = {});
 
       function renderChildren(containerComp, containerKey, containerElm) {
         if (containerComp.__OLUM__.components)
@@ -572,7 +573,7 @@ export default (function () {
     },
     getInnerNames(entry) {
       const comps = [];
-      const map = window.olum.app.map;
+      const map = olum.app.map;
       if (map) {
         map.find((obj) => {
           if (obj.name == entry)
@@ -595,7 +596,10 @@ export default (function () {
     },
   };
 
-  if (typeof window !== "undefined") window.olum = olum;
+  __olumRT = olum;
+
+  if (typeof window !== "undefined" && globalThis.__OLUM_DEV__)
+    window.olum = olum;
 
   class Olum {
     root = null;
@@ -617,7 +621,7 @@ export default (function () {
     }
 
     useRouter(router) {
-      window.olum.router = {
+      olum.router = {
         pathname: router.pathname,
         push: router.push,
         replace: router.replace,
@@ -634,7 +638,7 @@ export default (function () {
     useComponent(comp) {
       const entry = comp();
       const { store, rootKey } = this.share(entry);
-      const tree = window.olum.buildTree(entry, store, rootKey);
+      const tree = olum.buildTree(entry, store, rootKey);
       if (!tree) return console.warn("olum: couldn't build tree!");
 
       this.setupListeners(store);
@@ -669,7 +673,7 @@ export default (function () {
     }
 
     setupListeners(store) {
-      const mkHash = window.olum.mkHash;
+      const mkHash = olum.mkHash;
 
       const pending = new Map();
       let scheduled = false;
@@ -688,10 +692,10 @@ export default (function () {
           if (c) prevMounted[name] = c.hooks.isMounted;
         });
 
-        const treeElm = window.olum.buildTree(comp, store, compName);
+        const treeElm = olum.buildTree(comp, store, compName);
         if (!treeElm) return console.warn("olum: couldn't build tree!");
 
-        if (treeElm !== comp.el) window.olum.vdom.patch(comp.el, treeElm);
+        if (treeElm !== comp.el) olum.vdom.patch(comp.el, treeElm);
 
         const afterNames = Object.keys(store).filter(
           (name) => name !== compName,
@@ -732,7 +736,7 @@ export default (function () {
         });
       };
 
-      window.olum.flushUpdates = flush;
+      olum.flushUpdates = flush;
 
       window.addEventListener("updateOlumComp", (e) => {
         if (
@@ -769,52 +773,56 @@ export default (function () {
       const store = {};
       const rootKey = entry.__OLUM__.compName;
       store[rootKey] = entry;
-      Object.assign(window.olum.app, { store, registry: {} });
+      Object.assign(olum.app, { store, registry: {} });
       return { store, rootKey };
     }
   }
 
+  Olum.__olum = olum;
+
   return Olum;
 })();
 
+export const __olum = __olumRT;
+
 export const onMount = (cb) => cb;
 
-export const crossfade = (opts) => window.olum.crossfade(opts);
-export const easings =
-  typeof window !== "undefined" && window.olum ? window.olum.easings : {};
-export const transitions =
-  typeof window !== "undefined" && window.olum ? window.olum.transitions : {};
-export const params = (path, pathname) =>
-  window.olum.router.extractParams(path, pathname);
-export const push = (path) => window.olum.router.push(path);
-export const replace = (path) => window.olum.router.replace(path);
-export const back = () => window.olum.router.back();
-export const pathname = () => window.olum.router.pathname();
-export const forward = () => window.olum.router.forward();
-export const go = (n) => window.olum.router.go(n);
+export const flushUpdates = () => __olumRT.flushUpdates();
 
-export const props = (storeKey) => window.olum.props(storeKey);
+export const crossfade = (opts) => __olumRT.crossfade(opts);
+export const easings = __olumRT.easings;
+export const transitions = __olumRT.transitions;
+export const params = (path, pathname) =>
+  __olumRT.router.extractParams(path, pathname);
+export const push = (path) => __olumRT.router.push(path);
+export const replace = (path) => __olumRT.router.replace(path);
+export const back = () => __olumRT.router.back();
+export const pathname = () => __olumRT.router.pathname();
+export const forward = () => __olumRT.router.forward();
+export const go = (n) => __olumRT.router.go(n);
+
+export const props = (storeKey) => __olumRT.props(storeKey);
 
 export const store = (init) => {
-  if (!window.olum.store)
+  if (!__olumRT.store)
     throw new Error(
       "olum: store is unavailable — the store module (./store.js / olum-store package) is not installed",
     );
-  return window.olum.store(init);
+  return __olumRT.store(init);
 };
 
 if (typeof window !== "undefined")
   await import("olum-store")
-    .then((m) => (window.olum.store = m.default(window.olum)))
+    .then((m) => (__olumRT.store = m.default(__olumRT)))
     .catch(() => {});
 
 if (typeof window !== "undefined")
   await import("olum-transition")
-    .then((m) => window.olum.useTransition(m.default))
+    .then((m) => __olumRT.useTransition(m.default))
     .catch(() => {});
 
 export const scope = (name, index = 0) => {
-  const entries = (window.olum.app && window.olum.app.store) || {};
+  const entries = (__olumRT.app && __olumRT.app.store) || {};
   const matches = Object.keys(entries).filter((key) => {
     const tail = key.split(">").pop();
     return tail === name || tail.split(/[#@]/)[0] === name;

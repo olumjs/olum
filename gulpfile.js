@@ -3,6 +3,7 @@ const babel = require("gulp-babel");
 const uglify = require("gulp-uglify");
 const concat = require("gulp-concat");
 const header = require('gulp-header');
+const fs = require("fs");
 const pkgJSON = require("./package.json");
 
 const comment = 
@@ -31,4 +32,12 @@ gulp.task("compile", gulp.parallel(["compile:olum", "compile:vdom", "compile:tra
 
 gulp.task("copy", () => gulp.src(["./src/olum.js", "./src/vdom.js", "./src/transition.js"]).pipe(header(comment)).pipe(gulp.dest("dist")));
 
-gulp.task("default", gulp.series(["copy", "compile"]));
+gulp.task("version", (done) => {
+  const file = "./src/olum.js";
+  const src = fs.readFileSync(file, "utf8");
+  const out = src.replace(/(version:\s*")(?:\{olum_version\}|[^"]*)(")/, `$1${pkgJSON.version}$2`);
+  if (out !== src) fs.writeFileSync(file, out);
+  done();
+});
+
+gulp.task("default", gulp.series(["version", "copy", "compile"]));

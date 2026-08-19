@@ -17,27 +17,29 @@ const PASS_ICON = green("✔");
 const FAIL_ICON = red("✖");
 
 const OLUM_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/olum.js"),
+  path.join(__dirname, "../src/olum.js"),
   "utf8",
 );
 const VDOM_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/vdom.js"),
+  path.join(__dirname, "../src/vdom.js"),
   "utf8",
 );
 const STORE_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/store.js"),
+  path.join(__dirname, "../src/store.js"),
   "utf8",
 );
 const TRANSITION_SRC = fs.readFileSync(
-  path.join(__dirname, "../core/transition.js"),
+  path.join(__dirname, "../src/transition.js"),
   "utf8",
 );
-function load() {
+function load(opts) {
+  const dev = !opts || opts.dev !== false;
   const dom = new JSDOM(
     "<!doctype html><html><head></head><body></body></html>",
     { url: "http://localhost/" },
   );
 
+  global.__OLUM_DEV__ = dev;
   global.window = dom.window;
   global.document = dom.window.document;
   global.CustomEvent = dom.window.CustomEvent;
@@ -56,15 +58,16 @@ function load() {
   src +=
     "\n" +
     OLUM_SRC.replace(/^\s*import .*$/gm, "")
-      .replace(/^.*await import\(.*$/gm, "")
+      .replace(/await import\([\s\S]*?\.catch\(\(\) => \{\}\);/g, "undefined;")
       .replace(/^\s*export\s+default\s+/m, "const __OlumClass = ")
       .replace(/^\s*export\s+const\s+/gm, "const ");
-  src += "\nwindow.olum.store = createStore(window.olum);";
-  src += "\nwindow.olum.useTransition(transition);";
+  src += "\n__olumRT.store = createStore(__olumRT);";
+  src += "\n__olumRT.useTransition(transition);";
 
   src +=
-    "\n;return { Olum: __OlumClass, onMount: onMount, props: props, scope: scope };";
+    "\n;return { Olum: __OlumClass, onMount: onMount, props: props, scope: scope, olumRT: __olumRT };";
   const exported = new Function(src)();
+
   return {
     window: dom.window,
     document: dom.window.document,
@@ -110,13 +113,27 @@ console.log(
 
 section("§0 module bootstrap");
 
-check("evaluating the module installs window.olum", () => {
+check("evaluating the module installs window.olum in development", () => {
   const { window } = load();
   return (
     window.olum &&
     typeof window.olum.esc === "function" &&
     typeof window.olum.buildTree === "function"
   );
+});
+
+check("production (no __OLUM_DEV__) installs NO window.olum", () => {
+  const { window, olumRT } = load({ dev: false });
+  return (
+    window.olum === undefined &&
+    olumRT &&
+    typeof olumRT.buildTree === "function"
+  );
+});
+
+check("the runtime rides on the default export, not on window", () => {
+  const { Olum, olumRT } = load({ dev: false });
+  return Olum.__olum === olumRT && typeof Olum.__olum.mkElm === "function";
 });
 
 check("the default export is the Olum class", () => {
@@ -932,7 +949,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 71;
+const EXPECTED_CHECKS = 73;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
