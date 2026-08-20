@@ -17,19 +17,19 @@ const PASS_ICON = green("✔");
 const FAIL_ICON = red("✖");
 
 const OLUM_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/olum.js"),
+  path.join(__dirname, "../core/olum.js"),
   "utf8",
 );
 const VDOM_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/vdom.js"),
+  path.join(__dirname, "../core/vdom.js"),
   "utf8",
 );
 const STORE_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/store.js"),
+  path.join(__dirname, "../core/store.js"),
   "utf8",
 );
 const TRANSITION_SRC = fs.readFileSync(
-  path.join(__dirname, "../src/transition.js"),
+  path.join(__dirname, "../core/transition.js"),
   "utf8",
 );
 function load(opts) {
@@ -58,7 +58,7 @@ function load(opts) {
   src +=
     "\n" +
     OLUM_SRC.replace(/^\s*import .*$/gm, "")
-      .replace(/await import\([\s\S]*?\.catch\(\(\) => \{\}\);/g, "undefined;")
+      .replace(/^.*await import\(.*$/gm, "")
       .replace(/^\s*export\s+default\s+/m, "const __OlumClass = ")
       .replace(/^\s*export\s+const\s+/gm, "const ");
   src += "\n__olumRT.store = createStore(__olumRT);";

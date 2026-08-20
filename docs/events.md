@@ -52,7 +52,18 @@ A handler written inside a [`<for>`](/docs/loops) can reference the loop variabl
 ```
 
 :::note
-The recognized `on*` names are the standard DOM events (`onclick`, `oninput`, `onchange`, `onkeydown`, …). On a **component** tag, any `on*` name is a [function prop](/docs/components) instead.
+The recognized `on*` names are the standard DOM events (`onclick`, `oninput`, `onchange`, `onkeydown`, …). Everything on this page — inline arrows, bare expressions, `$event` — is for **plain elements**.
+
+On a **component** tag — any PascalCase tag you import, `<Input/>`, `<TextField/>`, `<Comp/>` — the same `on*` name is a [function prop](/docs/components) instead, and a function prop takes a **name only**:
+
+```html title="Component.html"
+<input oninput="e => console.log(123)" />    <!-- ✓ the real HTML element: inline code -->
+<Input oninput="{handleInput}" />            <!-- ✓ your component: a name -->
+<Input oninput="e => console.log(123)" />    <!-- ✗ arrives as a string, never runs -->
+<Input oninput="{e => console.log(123)}" />  <!-- ✗ arrives as undefined -->
+```
+
+Only the capital letter separates the two.
 :::
 
 ## Keyboard events

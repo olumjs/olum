@@ -13,6 +13,8 @@ OlumJS intentionally has **no naked braces** and **one way** to do each thing. T
 | `oninput={(e)=>…}` | `oninput="(e)=>…"` | events in `""` |
 | `<Comp {a} />` | `<Comp a="{a}" />` | no shorthand |
 | `<Comp a={a} />` | `<Comp a="{a}" />` | no naked-brace prop |
+| `<Comp onX="(e)=>…" />` | `<Comp onX="{handler}" />` | on a component `on*` is a prop, not DOM code — the arrow arrives as a plain string |
+| `<Comp onX="{(e)=>…}" />` / `<Comp onX="{obj.fn}" />` | name the function, pass the name | [function props](/docs/components) travel by name — anything else arrives `undefined` |
 | `<img {src} />` | `<img src="{src}" />` | no shorthand |
 | `:style="{…}"` | `style="color:{x}; …"` | string style + `{}` |
 | `:title="x"` | `title="{x}"` | string attr + `{}` |

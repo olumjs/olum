@@ -129,6 +129,58 @@ A prop can be a **function**. That's how a child talks up to its parent: the par
 <button onclick="sayHello()">Click to say hello</button>
 ```
 
+### The value must be a **name**, never an inline function
+
+Props cross into the child as **data**, so a function can only travel as a **reference the compiler can look up by name**. Two names resolve: a top-level function of this component, and a name destructured from `props()` (forwarding, below).
+
+```html title="Parent.html"
+<script>
+  import Input from "./Input";          // YOUR component, in Input.html
+  const handleInput = (e) => (state.text = e.target.value);
+</script>
+
+<Input oninput="{handleInput}" />        <!-- ✓ a top-level function of this component -->
+```
+
+:::note
+`Input` here is only an example name for a component **you** wrote — read it as any component, `<TextField/>`, `<CounterCard/>`, `<Comp/>`. The capital letter is the whole difference: a **PascalCase** tag is a component and gets props, a **lowercase** tag (`<input/>`, `<button/>`) is the real HTML element and gets DOM events. The two examples below say the same thing with the pair that is easiest to mix up.
+:::
+
+Anything else is **not** a function by the time the child reads it — the compiler does not report it, the child throws `oninput is not a function` when it calls the prop:
+
+```html title="Parent.html"
+<!-- capital I — <Input/> is a COMPONENT of yours, so oninput is a prop, not a DOM event -->
+<Input oninput="() => console.log(123)" />     <!-- ✗ arrives as the STRING "() => console.log(123)" -->
+<Input oninput="{() => console.log(123)}" />   <!-- ✗ inline function — dropped, arrives undefined -->
+<Input oninput="{state.handlers.input}" />     <!-- ✗ not a plain name — dropped, arrives undefined -->
+<Input oninput="{makeHandler(id)}" />          <!-- ✗ passes the call's RESULT, not a function -->
+```
+
+The fix is always the same: give the function a name in `<script>`, then pass the name.
+
+:::warn
+This rule is for **component** tags (PascalCase) only. Real HTML elements (lowercase) are unchanged — `<input oninput="state.counter++" />` and `<input oninput="e => console.log(123)" />` still work exactly as [Events](/docs/events) describes, because there `on*` is real DOM code, not a prop. Same six letters, opposite rules:
+
+```html title="Component.html"
+<input oninput="e => console.log(123)" />    <!-- ✓ real <input> element — inline code is fine -->
+<Input oninput="e => console.log(123)" />    <!-- ✗ YOUR <Input/> component — needs a name: "{handler}" -->
+```
+:::
+
+Need a handler that knows about a loop item? You can't pre-bind it in the tag — pass the data down and let the child hand it back:
+
+```html title="List.html"
+<!-- ✗ an inline arrow can't bind the row here -->
+<for each="row of state.rows" key="row.id">
+  <Row onPick="{() => pick(row.id)}" />
+</for>
+
+<!-- ✓ pass the row, let the child call back with it -->
+<for each="row of state.rows" key="row.id">
+  <Row row="{row}" onPick="{pick}" />       <!-- child: onPick(row.id) -->
+</for>
+```
+
 Forwarding through a middle component is just passing the prop along:
 
 ```html title="Outer.html"
@@ -158,7 +210,7 @@ A function prop also survives being written inside **another component's slot** 
 ```
 
 :::note
-On a **component** tag, an `on*` name is just a prop like any other — even `onclick`. `<CustomButton onclick="{handleClick}" />` hands the child a function; the child decides when to call it (e.g. from its own `<button onclick="onclick()">`). Only on plain elements is `on*` a real DOM event.
+On a **component** tag, an `on*` name is just a prop like any other — even `onclick`. `<CustomButton onclick="{handleClick}" />` hands the child a function; the child decides when to call it (e.g. from its own `<button onclick="onclick()">`). Only on plain elements is `on*` a real DOM event — which is why `<CustomButton onclick="() => …" />` does **not** work while `<button onclick="() => …">` does.
 :::
 
 ## Props are read-only (one-way data flow)

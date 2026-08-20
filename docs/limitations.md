@@ -71,3 +71,16 @@ There is no `<component is="…">` equivalent. Switch over the known component s
 <else-if when="state.color === 'green'"><GreenThing /></else-if>
 <else><BlueThing /></else>
 ```
+
+## 5. Function props travel by name
+
+A component's props are handed over as data, so a function prop only arrives when its value is a plain **name** the compiler can resolve — a top-level function of the parent, or a name destructured from `props()`. An inline arrow, a member expression (`obj.fn`) or a call is silently not a function on the child side:
+
+```html title="Parent.html"
+<!-- <Input/> = a component YOU wrote (any PascalCase name), not the HTML <input/> element -->
+<Input oninput="{handleInput}" />              <!-- ✓ -->
+<Input oninput="(e) => state.text = e" />      <!-- ✗ arrives as a string -->
+<Input oninput="{(e) => state.text = e}" />    <!-- ✗ arrives as undefined -->
+```
+
+Plain elements are not affected — inline code in `on*` is the normal way to write them ([Events](/docs/events)). To pre-bind data, pass it as its own prop and let the child call the handler with it ([Components & Props](/docs/components)).

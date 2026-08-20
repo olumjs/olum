@@ -25,7 +25,7 @@ A condensed cheat-sheet covering all template syntax at a glance.
 <!-- ASSET URLS (root-absolute, served from public/) -->
 <img src="/assets/logo.svg" />
 
-<!-- EVENTS (code in "") -->
+<!-- EVENTS (code in "") — PLAIN ELEMENTS ONLY; on a component tag on* is a prop, see FUNCTION PROPS -->
 <button onclick="save()">Save</button>
 <input oninput="(e)=> state.text = e.target.value" />
 <input oninput="setValue($event)" />
@@ -93,8 +93,12 @@ const { size = "md" } = props();      // default value when the parent omits it
 {title} {children}                    // use the names anywhere — always the LATEST values
 {props().title}                       // equivalent direct read
 
-<!-- FUNCTION PROPS (component events) -->
+<!-- FUNCTION PROPS (component events: PascalCase tag = your component, lowercase = real HTML) -->
+<!-- a NAME only, never inline code -->
 <Inner onMessage="{handleMessage}" />  <!-- child: const { onMessage } = props(); onMessage(payload) -->
+<Inner onMessage="(e)=> …" />          <!-- ✗ arrives as a plain string -->
+<Inner onMessage="{(e)=> …}" />        <!-- ✗ inline fn / obj.fn / fn(arg) → arrives undefined -->
+<Row row="{row}" onPick="{pick}" />    <!-- pre-bind data by passing it, child calls onPick(row.id) -->
 
 <!-- DERIVED VALUES (plain functions) -->
 const doubled = () => state.count * 2;
