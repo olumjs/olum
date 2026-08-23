@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.9.4",
+    version: "0.9.5",
     framework: "OlumJS",
     app: {},
 
@@ -186,21 +186,37 @@ export default (function () {
     html(value) {
       return { __olumHtml: true, html: value == null ? "" : String(value) };
     },
+
+    parseEventArgs(payload) {
+      if (!payload) return [];
+      try {
+        return JSON.parse(decodeURIComponent(payload));
+      } catch (err) {
+        try {
+          return JSON.parse(payload);
+        } catch (err2) {
+          console.warn("olum: couldn't read event args — " + payload);
+          return [];
+        }
+      }
+    },
     eventsHandler(el, nodes, compName, methodsRefObj) {
       function event(item, str, modifiers) {
         const sig =
           str +
           "\u0001" +
           (modifiers && modifiers.length ? modifiers.join(".") : "");
-        const eventName = str.split("|")[0];
-        str = str.split("|").slice(1).join();
 
-        let methods = str.split("&");
-        const data = methods.map((chunk) => {
-          const chunks = chunk.split("=");
-          const name = chunks[0];
-          const args = JSON.parse(chunks.slice(1).join(""));
-          return { args, methodName: name };
+        const bar = str.indexOf("|");
+        const eventName = bar === -1 ? str : str.slice(0, bar);
+        const chain = bar === -1 ? "" : str.slice(bar + 1);
+
+        const data = (chain ? chain.split("&") : []).map((chunk) => {
+          const eq = chunk.indexOf("=");
+          return {
+            args: olum.parseEventArgs(eq === -1 ? "" : chunk.slice(eq + 1)),
+            methodName: eq === -1 ? chunk : chunk.slice(0, eq),
+          };
         });
 
         const opts = {
