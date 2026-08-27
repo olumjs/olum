@@ -840,9 +840,9 @@ function mountable(document) {
 
 function mount(factory) {
   const { Olum, window, document } = load();
-  document.body.innerHTML = `<div id="app"></div>`;
-  new Olum().$("#app").use(factory);
-  return window.document.querySelector("#app").innerHTML;
+  document.body.innerHTML = `<div id="olum-app"></div>`;
+  new Olum().$("#olum-app").use(factory);
+  return window.document.querySelector("#olum-app").innerHTML;
 }
 
 check(
@@ -865,7 +865,7 @@ check(
 
 check("a router instance still takes the router branch", () => {
   const { Olum, document } = load();
-  document.body.innerHTML = `<div id="app"></div>`;
+  document.body.innerHTML = `<div id="olum-app"></div>`;
   let listened = false;
   const router = {
     name: () => "Router",
@@ -874,7 +874,7 @@ check("a router instance still takes the router branch", () => {
     pathname: () => "/",
   };
   router.__proto__ = Object.create(Object.prototype);
-  new Olum().$("#app").use(router);
+  new Olum().$("#olum-app").use(router);
   return listened && typeof router.render === "function";
 });
 
@@ -889,9 +889,9 @@ check(
   "a non-callable, non-router argument fails in useComponent, not in use()",
   () => {
     const { Olum, document } = load();
-    document.body.innerHTML = `<div id="app"></div>`;
+    document.body.innerHTML = `<div id="olum-app"></div>`;
     try {
-      new Olum().$("#app").use({ nope: true });
+      new Olum().$("#olum-app").use({ nope: true });
       return false;
     } catch (err) {
       return err instanceof TypeError && /is not a function/.test(err.message);
@@ -903,10 +903,10 @@ check(
   "an already-invoked component (use(Page()) typo) fails loudly rather than silently",
   () => {
     const { Olum, document } = load();
-    document.body.innerHTML = `<div id="app"></div>`;
+    document.body.innerHTML = `<div id="olum-app"></div>`;
     const entry = mountable(document)();
     try {
-      new Olum().$("#app").use(entry);
+      new Olum().$("#olum-app").use(entry);
       return false;
     } catch (err) {
       return /is not a function/.test(err.message);
@@ -918,13 +918,13 @@ check(
   "passing the Router class instead of an instance hits Router's own new-keyword guard",
   () => {
     const { Olum, document } = load();
-    document.body.innerHTML = `<div id="app"></div>`;
+    document.body.innerHTML = `<div id="olum-app"></div>`;
     function Router(config) {
       if (!(this instanceof Router))
         throw new Error("can't invoke 'Router' without 'new' keyword");
     }
     try {
-      new Olum().$("#app").use(Router);
+      new Olum().$("#olum-app").use(Router);
       return false;
     } catch (err) {
       return /without 'new' keyword/.test(err.message);
