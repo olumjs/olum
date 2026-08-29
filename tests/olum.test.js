@@ -932,6 +932,236 @@ check(
   },
 );
 
+section("§19 <head> page metadata merge");
+
+const BASELINE_HEAD = `<title>Olum Project</title><meta charset="UTF-8" /><meta name="generator" content="OlumJS" /><link rel="stylesheet" href="/main.css" />`;
+
+function withHead(head) {
+  const env = load();
+  env.document.head.innerHTML = head === undefined ? BASELINE_HEAD : head;
+  return env;
+}
+const headHtml = (document) => document.head.innerHTML.replace(/\s+/g, " ");
+const parked = (document) => {
+  const tpl = document.head.querySelector("template[data-olum-head]");
+  return tpl ? tpl.innerHTML.replace(/\s+/g, " ") : "";
+};
+
+check(
+  "a page <title> takes index.html's exact position, and the original is parked",
+  () => {
+    const { olum, document } = withHead();
+    olum.applyHead(`<title>Match page</title>`);
+    const live = document.head.children[0];
+    return (
+      live.tagName === "TITLE" &&
+      live.textContent === "Match page" &&
+      live.getAttribute("data-olum-head") === "0" &&
+      /<title>Olum Project<\/title>/.test(parked(document))
+    );
+  },
+);
+
+check("a tag index.html does not have is appended", () => {
+  const { olum, document } = withHead();
+  olum.applyHead(`<meta property="og:title" content="Match" />`);
+  return (
+    /<meta property="og:title" content="Match" data-olum-head=""/.test(
+      headHtml(document),
+    ) && !parked(document)
+  );
+});
+
+check(
+  "navigating to a page with no head restores index.html's head exactly",
+  () => {
+    const { olum, document } = withHead();
+    const before = headHtml(document);
+    olum.applyHead(
+      `<title>Match page</title><meta property="og:title" content="Match" />`,
+    );
+    olum.applyHead("");
+    return headHtml(document) === before && !parked(document);
+  },
+);
+
+check("page A's metadata cannot leak into page B", () => {
+  const { olum, document } = withHead();
+  olum.applyHead(
+    `<meta property="og:title" content="A" /><meta name="robots" content="noindex" />`,
+  );
+  olum.applyHead(`<meta property="og:title" content="B" />`);
+  const html = headHtml(document);
+  return (
+    /content="B"/.test(html) &&
+    !/content="A"/.test(html) &&
+    !/robots/.test(html)
+  );
+});
+
+check("index.html's stylesheet survives a page that links its own", () => {
+  const { olum, document } = withHead();
+  olum.applyHead(`<link rel="stylesheet" href="/page.css" />`);
+  const html = headHtml(document);
+  return /href="\/main.css"/.test(html) && /href="\/page.css"/.test(html);
+});
+
+check("a repeated slot inside ONE head keeps the last tag, not both", () => {
+  const { olum, document } = withHead();
+  olum.applyHead(
+    `<meta name="robots" content="noindex" /><meta name="robots" content="all" />`,
+  );
+  const html = headHtml(document);
+  return /content="all"/.test(html) && !/content="noindex"/.test(html);
+});
+
+check("charset, canonical and ld+json each override their own slot", () => {
+  const { olum, document } = withHead(
+    BASELINE_HEAD +
+      `<link rel="canonical" href="/old" /><script type="application/ld+json">{"a":1}</script>`,
+  );
+  olum.applyHead(
+    `<meta charset="utf-8" /><link rel="canonical" href="/new" /><script type="application/ld+json">{"a":2}</script>`,
+  );
+  const html = headHtml(document);
+  return (
+    !/UTF-8/.test(html.replace(parked(document), "")) &&
+    /href="\/new"/.test(html) &&
+    !/href="\/old"/.test(html.replace(parked(document), "")) &&
+    /\{"a":2\}/.test(html) &&
+    !/\{"a":1\}/.test(html.replace(parked(document), ""))
+  );
+});
+
+check("a <style> injected by injectStyle is never touched", () => {
+  const { olum, document } = withHead();
+  olum.injectStyle("Page", "main{color:red}");
+  olum.applyHead(`<title>Match page</title>`);
+  olum.applyHead("");
+  return !!document.getElementById("olum-style-Page");
+});
+
+check(
+  "a prerendered head round-trips: navigating away recovers index.html's head",
+  () => {
+    const first = withHead();
+    first.olum.applyHead(
+      `<title>Match page</title><meta property="og:title" content="A" />`,
+    );
+    const prerendered = first.document.head.innerHTML;
+
+    const cold = withHead(prerendered);
+    cold.olum.applyHead("");
+    const after = headHtml(cold.document);
+
+    const clean = withHead();
+    clean.olum.applyHead("");
+    return (
+      after === headHtml(clean.document) && !/og:title|Match page/.test(after)
+    );
+  },
+);
+
+check("useComponent applies the mounted page's head", () => {
+  const { Olum, document, olum } = load();
+  document.head.innerHTML = BASELINE_HEAD;
+  document.body.innerHTML = `<div id="olum-app"></div>`;
+  const el = document.createElement("div");
+  el.innerHTML = `<span>hi</span>`;
+  new Olum().$("#olum-app").use(() => ({
+    __OLUM__: {
+      compName: "Page",
+      getElm: el,
+      components: {},
+      __head__: () => `<title>From the page</title>`,
+    },
+    methodsRef: {},
+    props: {},
+    methods: {},
+    hooks: {
+      mounted: null,
+      unMounted: null,
+      isMounted: false,
+      isUnMounted: false,
+    },
+  }));
+  return /<title data-olum-head="0">From the page<\/title>/.test(
+    headHtml(document),
+  );
+});
+
+check(
+  "a page component with no __head__ still resets the previous route's head",
+  () => {
+    const { Olum, document, olum } = load();
+    document.head.innerHTML = BASELINE_HEAD;
+    const before = headHtml(document);
+    document.body.innerHTML = `<div id="olum-app"></div>`;
+    olum.applyHead(`<title>Previous route</title>`);
+    const el = document.createElement("div");
+    new Olum().$("#olum-app").use(() => ({
+      __OLUM__: { compName: "Page", getElm: el, components: {} },
+      methodsRef: {},
+      props: {},
+      methods: {},
+      hooks: {
+        mounted: null,
+        unMounted: null,
+        isMounted: false,
+        isUnMounted: false,
+      },
+    }));
+    return headHtml(document) === before;
+  },
+);
+
+const mkHeadOwner = () => ({
+  __OLUM__: { __head__: () => `<title>changed</title>` },
+});
+
+check("refreshHead re-applies the head in development", () => {
+  const { olum, document } = load();
+  document.head.innerHTML = `<title>Olum Project</title>`;
+  const comp = mkHeadOwner();
+  olum.headOwner = comp;
+  olum.headHtml = "";
+  olum.refreshHead(comp);
+  return document.title === "changed";
+});
+
+check("refreshHead re-applies the head in a production build too", () => {
+  const { olumRT, document } = load({ dev: false });
+  document.head.innerHTML = `<title>Olum Project</title>`;
+  const comp = mkHeadOwner();
+  olumRT.headOwner = comp;
+  olumRT.headHtml = "";
+  olumRT.refreshHead(comp);
+  return document.title === "changed";
+});
+
+check("refreshHead ignores a component that does not own the head", () => {
+  const { olum, document } = load();
+  document.head.innerHTML = `<title>Olum Project</title>`;
+  olum.headOwner = mkHeadOwner();
+  olum.headHtml = "";
+  olum.refreshHead(mkHeadOwner());
+  return document.title === "Olum Project";
+});
+
+check("refreshHead does no DOM work when the head is unchanged", () => {
+  const { olum, document } = load();
+  document.head.innerHTML = `<title>Olum Project</title>`;
+  const comp = mkHeadOwner();
+  olum.headOwner = comp;
+  olum.headHtml = "";
+  olum.refreshHead(comp);
+  const titleRef = document.querySelector("title");
+  olum.refreshHead(comp);
+  return (
+    document.querySelector("title") === titleRef && document.title === "changed"
+  );
+});
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -949,7 +1179,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 73;
+const EXPECTED_CHECKS = 88;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(

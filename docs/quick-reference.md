@@ -106,6 +106,19 @@ const doubled = () => state.count * 2;
 
 <!-- host: this component's root element, inside onMount -->
 onMount(() => { host.querySelector("main"); });
+
+<!-- PAGE METADATA (page.html / not-found.html ONLY — ignored elsewhere, with a warning) -->
+<head>
+  <title>{post.title} — My Blog</title>                       <!-- {expr} reads the <script> scope -->
+  <meta name="description" content="{post.excerpt}" />        <!-- escaped, like the template -->
+  <link rel="canonical" href="https://ex.com/blog/{slug}" />
+  <meta property="og:image" content="{post.cover}" />         <!-- same name/property = same slot -->
+  <script type="application/ld+json">
+    { "@type": "Article", "headline": "{post.title}" }        <!-- bare { = JSON; {expr} only INSIDE "…", inserted raw -->
+  </script>
+</head>
+<!-- merges over public/index.html: same slot replaces in place, new tags append -->
+<!-- applied at mount only; every route mount restores the baseline first, so nothing leaks -->
 ```
 
 :::tip[The design principle]

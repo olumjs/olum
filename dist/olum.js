@@ -1,6 +1,6 @@
 /**
 * @name olum
-* @version 0.9.5
+* @version 0.10.0
 * @copyright 2026 
 * @author Eissa Saber
 * @license MIT
@@ -11,7 +11,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.9.5",
+    version: "0.10.0",
     framework: "OlumJS",
     app: {},
 
@@ -48,6 +48,131 @@ export default (function () {
       tag.id = id;
       tag.textContent = cssContent;
       document.head.appendChild(tag);
+    },
+
+    headMark: "data-olum-head",
+
+    headKey(node) {
+      if (!node || node.nodeType !== 1) return null;
+      const tag = node.tagName.toLowerCase();
+      const attr = (name) => node.getAttribute(name);
+      if (tag === "title" || tag === "base") return tag;
+      if (tag === "meta") {
+        if (node.hasAttribute("charset")) return "meta:charset";
+        const name =
+          attr("name") ||
+          attr("property") ||
+          attr("http-equiv") ||
+          attr("itemprop");
+        return name ? "meta:" + name.toLowerCase() : null;
+      }
+      if (tag === "link") {
+        const rel = (attr("rel") || "").toLowerCase();
+        if (!rel) return null;
+
+        const single = [
+          "canonical",
+          "icon",
+          "shortcut icon",
+          "apple-touch-icon",
+          "manifest",
+          "amphtml",
+        ];
+        return (
+          "link:" +
+          rel +
+          (single.indexOf(rel) === -1 ? ":" + (attr("href") || "") : "")
+        );
+      }
+      if (tag === "script") {
+        if ((attr("type") || "").toLowerCase() === "application/ld+json")
+          return "ld+json" + (node.id ? ":" + node.id : "");
+        return attr("src") ? "script:" + attr("src") : null;
+      }
+      return null;
+    },
+
+    headParking(create) {
+      let tpl = document.head.querySelector("template[" + olum.headMark + "]");
+      if (!tpl && create) {
+        tpl = document.createElement("template");
+        tpl.setAttribute(olum.headMark, "");
+        document.head.appendChild(tpl);
+      }
+      return tpl;
+    },
+
+    resetHead() {
+      const tpl = olum.headParking(false);
+
+      const held = tpl ? Array.prototype.slice.call(tpl.content.children) : [];
+      const mine = document.head.querySelectorAll(
+        "[" + olum.headMark + "]:not(template)",
+      );
+      Array.prototype.forEach.call(mine, (node) => {
+        if (!node.parentNode) return;
+        const slot = node.getAttribute(olum.headMark);
+        const original = slot === "" ? null : held[Number(slot)];
+        if (original) return node.parentNode.replaceChild(original, node);
+
+        const gap = node.previousSibling;
+        if (gap && gap.nodeType === 3 && !gap.textContent.trim())
+          gap.parentNode.removeChild(gap);
+        node.parentNode.removeChild(node);
+      });
+      if (tpl && tpl.parentNode) tpl.parentNode.removeChild(tpl);
+    },
+
+    headOwner: null,
+    headHtml: "",
+
+    refreshHead(comp) {
+      if (!comp || comp !== olum.headOwner) return;
+      const html = comp.__OLUM__.__head__();
+      if (html === olum.headHtml) return;
+      olum.headHtml = html;
+      olum.applyHead(html);
+    },
+    applyHead(html) {
+      olum.resetHead();
+      if (!html || !String(html).trim()) return;
+
+      const doc = document.implementation.createHTMLDocument("");
+      doc.head.innerHTML = html;
+
+      Array.prototype.slice.call(doc.head.children).forEach((node) => {
+        const incoming = document.importNode(node, true);
+        const key = olum.headKey(incoming);
+        let slot = "";
+        let anchor = null;
+
+        if (key) {
+          const kids = Array.prototype.slice.call(document.head.children);
+          for (let i = 0; i < kids.length; i++) {
+            const held = kids[i];
+            if (olum.headKey(held) !== key) continue;
+            const mark = held.getAttribute(olum.headMark);
+            anchor = held.nextSibling;
+            if (mark === null) {
+              const tpl = olum.headParking(true);
+              slot = String(tpl.content.children.length);
+              document.head.removeChild(held);
+              tpl.content.appendChild(held);
+            } else {
+              slot = mark;
+              document.head.removeChild(held);
+            }
+            break;
+          }
+        }
+
+        incoming.setAttribute(olum.headMark, slot);
+        if (anchor) document.head.insertBefore(incoming, anchor);
+        else {
+          document.head.appendChild(document.createTextNode("\n    "));
+          document.head.appendChild(incoming);
+        }
+      });
     },
 
     proxyHandler(obj, watcher, el) {
@@ -628,6 +753,7 @@ export default (function () {
     root = null;
     $(s) {
       this.root = document.querySelector(s);
+      if (this?.root?.innerHTML) this.root.innerHTML = "";
       return this;
     }
 
@@ -668,6 +794,10 @@ export default (function () {
 
       this.root.innerHTML = "";
       this.root.append(tree);
+
+      olum.headOwner = entry.__OLUM__.__head__ ? entry : null;
+      olum.headHtml = olum.headOwner ? entry.__OLUM__.__head__() : "";
+      olum.applyHead(olum.headHtml);
 
       if (entry.hooks.mounted) {
         const onMount = entry.hooks.mounted;
@@ -719,6 +849,8 @@ export default (function () {
         if (!treeElm) return console.warn("olum: couldn't build tree!");
 
         if (treeElm !== comp.el) olum.vdom.patch(comp.el, treeElm);
+
+        olum.refreshHead(comp);
 
         const afterNames = Object.keys(store).filter(
           (name) => name !== compName,
