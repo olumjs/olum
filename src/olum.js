@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.10.0",
+    version: "0.10.1",
     framework: "OlumJS",
     app: {},
 
@@ -632,7 +632,14 @@ export default (function () {
           const keyVal = placeholder.getAttribute("data-o-key");
           let instanceKey;
           if (keyVal !== null && keyVal !== "") {
-            instanceKey = containerKey + ">" + name + "@" + keyVal;
+            occ[name] = occ[name] === undefined ? 0 : occ[name] + 1;
+            instanceKey =
+              containerKey +
+              ">" +
+              name +
+              "@" +
+              keyVal +
+              (occ[name] ? "#" + occ[name] : "");
           } else {
             occ[name] = occ[name] === undefined ? 0 : occ[name] + 1;
             instanceKey = containerKey + ">" + name + "#" + occ[name];
