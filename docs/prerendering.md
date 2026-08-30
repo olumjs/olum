@@ -254,11 +254,12 @@ Extra settling time, in **milliseconds, per route**, taken after the page report
 
 | Set to | Result |
 |--------|--------|
-| `0` or missing | no wait (the default) |
-| `500` | every route waits 500 ms before capture |
-| anything not a number (`true`, `"soon"`, `-1`) | error line, treated as `0` — never fails the build |
+| missing | 500 ms — **the default** |
+| `0` | no wait — opt out |
+| `250` | every route waits 250 ms before capture |
+| anything not a number (`true`, `"soon"`, `-1`) | error line, treated as 500 — never fails the build |
 
-Use it when a page loads data at mount. Leave it at `0` when every page renders from data it already has — the wait is pure build time you'd never get back.
+The default covers the common case: a page that loads data at mount. Set it to `0` when every page renders from data it already has — the wait is pure build time you'd never get back, and it is charged per route.
 
 ## What happens in the browser
 

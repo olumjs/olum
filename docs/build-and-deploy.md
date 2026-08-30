@@ -51,7 +51,7 @@ Build settings live under one `olum` key:
 }
 ```
 
-`SITE_URL` is the absolute base for every `<loc>` in `sitemap.xml` — without it crawlers ignore the file. `SSG_DELAY` is settling time in milliseconds per route — leave it at `0` unless a page fetches its data in `onMount`. Both are optional and documented in [Prerendering & SEO](/docs/prerendering).
+`SITE_URL` is the absolute base for every `<loc>` in `sitemap.xml` — without it crawlers ignore the file. `SSG_DELAY` is settling time in milliseconds per route, `500` by default — set it to `0` when no page fetches its data in `onMount`. Both are optional and documented in [Prerendering & SEO](/docs/prerendering).
 
 ## Previewing the build
 
