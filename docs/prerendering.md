@@ -186,7 +186,7 @@ The [`<head>`](/docs/metadata) re-renders with the page, so the metadata catches
 
 ### Choosing a value
 
-It is **off by default** (`0`). Start small — 200–500 ms covers most local and same-region data — and the build tells you what it costs before it spends it:
+It is `500` unless you say otherwise. Start small — 200–500 ms covers most local and same-region data — and the build tells you what it costs before it spends it:
 
 ```text
 SSG: waiting 500ms after each route (+46.5s to this build)
@@ -222,13 +222,14 @@ If it isn't set the build warns and falls back to relative paths.
 
 ## Build settings (`package.json`)
 
-Both settings live under one `olum` key. Neither is required — the build runs without them and tells you what it lost.
+Build settings live under one `olum` key. None of them is required — the build runs without them and tells you what it lost.
 
 ```json title="package.json"
 {
   "olum": {
     "SITE_URL": "https://example.com",
-    "SSG_DELAY": 500
+    "SSG_DELAY": 500,
+    "base": "/"
   }
 }
 ```
@@ -260,6 +261,14 @@ Extra settling time, in **milliseconds, per route**, taken after the page report
 | anything not a number (`true`, `"soon"`, `-1`) | error line, treated as 500 — never fails the build |
 
 The default covers the common case: a page that loads data at mount. Set it to `0` when every page renders from data it already has — the wait is pure build time you'd never get back, and it is charged per route.
+
+### `base`
+
+The URL prefix every asset link in `dist/` gets, `/` by default — see [Base URL](/docs/build-and-deploy#base-url).
+
+:::warn
+Prerendering needs a base that resolves the same from every directory, so `"/"` (or a sub-path like `"/app/"`) is the only thing that works here. A **relative** base (`"./"`, for a `file://` desktop shell) breaks prerendered pages: each route is a copy of `dist/index.html` in its own folder, so `./assets/…` is looked for in `/blog/hello/assets/…` and 404s.
+:::
 
 ## What happens in the browser
 

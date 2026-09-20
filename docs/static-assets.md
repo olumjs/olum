@@ -38,6 +38,14 @@ Because the URL is just a string, `{expr}` interpolation composes paths freely �
 
 The [production build](/docs/build-and-deploy) copies every file in `public/` into the final output, so assets referenced from runtime strings like this are always available.
 
+## If the site isn't served from a domain root
+
+Root-absolute is still what you write. A build with a [`base`](/docs/build-and-deploy#base-url) other than `/` — a sub-path, a CDN, a `file://` desktop shell — re-points `src`, `href` and `poster` values that name a real file in `public/`, so `/assets/logo.svg` comes out with the right prefix on its own.
+
+:::warn
+Two spellings are **not** rewritten and stay root-absolute: `url(...)` inside a component `<style>`, and a path assembled at runtime (`url(/assets/{type}.svg)`). Under a non-default base those requests miss. Reference such an image from a template `src` attribute instead.
+:::
+
 :::note
 `public/index.html` is your app shell and `public/main.css` its global stylesheet — both are processed by the build. Everything else in `public/` ships as-is, so don't keep scratch files there.
 :::
