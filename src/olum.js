@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.11.0",
+    version: "0.12.0",
     framework: "OlumJS",
     app: {},
 
@@ -746,8 +746,11 @@ export default (function () {
 
   __olumRT = olum;
 
-  if (typeof window !== "undefined" && globalThis.__OLUM_DEV__)
-    window.olum = olum;
+  if (typeof window !== "undefined") {
+    window.olum = globalThis.__OLUM_DEV__
+      ? olum
+      : Object.freeze({ version: olum.version, framework: olum.framework });
+  }
 
   class Olum {
     root = null;

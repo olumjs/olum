@@ -122,14 +122,20 @@ check("evaluating the module installs window.olum in development", () => {
   );
 });
 
-check("production (no __OLUM_DEV__) installs NO window.olum", () => {
-  const { window, olumRT } = load({ dev: false });
-  return (
-    window.olum === undefined &&
-    olumRT &&
-    typeof olumRT.buildTree === "function"
-  );
-});
+check(
+  "production (no __OLUM_DEV__) exposes only version + framework on window.olum",
+  () => {
+    const { window, olumRT } = load({ dev: false });
+    const g = window.olum;
+    return (
+      Object.keys(g).sort().join(",") === "framework,version" &&
+      g.framework === "OlumJS" &&
+      g.version === olumRT.version &&
+      Object.isFrozen(g) &&
+      typeof olumRT.buildTree === "function"
+    );
+  },
+);
 
 check("the runtime rides on the default export, not on window", () => {
   const { Olum, olumRT } = load({ dev: false });

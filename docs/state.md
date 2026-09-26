@@ -70,7 +70,7 @@ flushUpdates();                         // settle re-renders NOW (mostly useful 
 host.querySelector("span").textContent; // fresh
 ```
 
-`window.olum.flushUpdates()` does the same thing, but `window.olum` exists in **development only** — a production build ships no runtime globals, so import `flushUpdates` instead.
+`window.olum.flushUpdates()` does the same thing, but the full `window.olum` exists in **development only** — a production build exposes just `window.olum.version` and `window.olum.framework` (for detection tools), so import `flushUpdates` instead.
 
 A write to a key the template never reads doesn't schedule a render at all — see [Rendering & Updates](/docs/rendering) for the full update cycle and what survives a patch.
 
