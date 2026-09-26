@@ -20,7 +20,7 @@ Import `onMount` from `olum` and call it with a callback. The callback runs when
 ```
 
 - The `onMount` callback runs when the component is inserted into the DOM.
-- The **returned cleanup function** runs when it's removed (e.g. an `<if>` toggles it off, or a keyed list item is removed).
+- The **returned cleanup function** runs when it's removed (e.g. an `<if>` toggles it off, or a keyed list item is removed), and for every mounted component when the whole app is torn down with [`app.destroy()`](/docs/embedding) (embedding is under maintenance).
 - The callback can be `async` — the usual place to fetch initial data:
 
 ```html title="Component.html"

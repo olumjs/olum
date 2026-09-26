@@ -107,6 +107,11 @@ const doubled = () => state.count * 2;
 <!-- host: this component's root element, inside onMount -->
 onMount(() => { host.querySelector("main"); });
 
+<!-- MOUNT / UNMOUNT (embedding in React / Vue — UNDER MAINTENANCE, may change) -->
+const app = new Olum();
+app.$("#olum-app").use(App);   // $() also takes an element (a React/Vue ref)
+app.destroy();                 // runs every cleanup, restores <head>, empties the root
+
 <!-- PAGE METADATA (page.html / not-found.html ONLY — ignored elsewhere, with a warning) -->
 <head>
   <title>{post.title} — My Blog</title>                       <!-- {expr} reads the <script> scope -->

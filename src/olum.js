@@ -751,8 +751,9 @@ export default (function () {
 
   class Olum {
     root = null;
+
     $(s) {
-      this.root = document.querySelector(s);
+      this.root = typeof s === "string" ? document.querySelector(s) : s;
       if (this?.root?.innerHTML) this.root.innerHTML = "";
       return this;
     }
@@ -790,7 +791,9 @@ export default (function () {
       const tree = olum.buildTree(entry, store, rootKey);
       if (!tree) return console.warn("olum: couldn't build tree!");
 
-      this.setupListeners(store);
+      if (this._offUpdates) this._offUpdates();
+      this._offUpdates = this.setupListeners(store);
+      this._store = store;
 
       this.root.innerHTML = "";
       this.root.append(tree);
@@ -893,7 +896,7 @@ export default (function () {
 
       olum.flushUpdates = flush;
 
-      window.addEventListener("updateOlumComp", (e) => {
+      const onUpdate = (e) => {
         if (
           e &&
           e.detail &&
@@ -921,7 +924,38 @@ export default (function () {
             Promise.resolve().then(flush);
           }
         }
-      });
+      };
+      window.addEventListener("updateOlumComp", onUpdate);
+
+      return () => {
+        pending.clear();
+        window.removeEventListener("updateOlumComp", onUpdate);
+      };
+    }
+
+    destroy() {
+      const store = this._store;
+      if (!store) return;
+      this._store = null;
+      this._offUpdates();
+
+      const depth = (key) => key.split(">").length;
+      Object.keys(store)
+        .sort((a, b) => depth(b) - depth(a))
+        .forEach((key) => {
+          const hooks = store[key] && store[key].hooks;
+          if (!hooks || !hooks.isMounted) return;
+          hooks.isMounted = false;
+          hooks.isUnMounted = true;
+          if (typeof hooks.unMounted === "function") hooks.unMounted();
+        });
+
+      if (olum.app.store === store) {
+        Object.assign(olum.app, { store: {}, registry: {} });
+        olum.resetHead();
+      }
+      if (this.root) this.root.innerHTML = "";
+      this.root = null;
     }
 
     share(entry) {
