@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.12.0",
+    version: "0.12.1",
     framework: "OlumJS",
     app: {},
 
@@ -788,13 +788,29 @@ export default (function () {
       if (router.isReady) router.listen();
     }
 
+    unmountStore(store) {
+      if (this._offUpdates) this._offUpdates();
+      this._offUpdates = null;
+      const depth = (key) => key.split(">").length;
+      Object.keys(store)
+        .sort((a, b) => depth(b) - depth(a))
+        .forEach((key) => {
+          const hooks = store[key] && store[key].hooks;
+          if (!hooks || !hooks.isMounted) return;
+          hooks.isMounted = false;
+          hooks.isUnMounted = true;
+          if (typeof hooks.unMounted === "function") hooks.unMounted();
+        });
+    }
+
     useComponent(comp) {
+      if (this._store) this.unmountStore(this._store);
+
       const entry = comp();
       const { store, rootKey } = this.share(entry);
       const tree = olum.buildTree(entry, store, rootKey);
       if (!tree) return console.warn("olum: couldn't build tree!");
 
-      if (this._offUpdates) this._offUpdates();
       this._offUpdates = this.setupListeners(store);
       this._store = store;
 
@@ -940,18 +956,7 @@ export default (function () {
       const store = this._store;
       if (!store) return;
       this._store = null;
-      this._offUpdates();
-
-      const depth = (key) => key.split(">").length;
-      Object.keys(store)
-        .sort((a, b) => depth(b) - depth(a))
-        .forEach((key) => {
-          const hooks = store[key] && store[key].hooks;
-          if (!hooks || !hooks.isMounted) return;
-          hooks.isMounted = false;
-          hooks.isUnMounted = true;
-          if (typeof hooks.unMounted === "function") hooks.unMounted();
-        });
+      this.unmountStore(store);
 
       if (olum.app.store === store) {
         Object.assign(olum.app, { store: {}, registry: {} });
