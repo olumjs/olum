@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.12.2",
+    version: "0.12.3",
     framework: "OlumJS",
     app: {},
 
@@ -783,6 +783,7 @@ export default (function () {
         go: router.go,
         extractParams: router.extractParams,
         searchParams: router.searchParams,
+        setSearchParam: router.setSearchParam,
       };
       router.__proto__.rootElm = this.root;
       router.render = (view) => this.useComponent(view);
@@ -999,6 +1000,8 @@ export const params = (path, pathname) =>
   __olumRT.router.extractParams(path, pathname);
 export const pathname = () => __olumRT.router.pathname();
 export const searchParams = () => __olumRT.router.searchParams();
+export const setSearchParam = (key, value) =>
+  __olumRT.router.setSearchParam(key, value);
 
 export const props = (storeKey) => __olumRT.props(storeKey);
 

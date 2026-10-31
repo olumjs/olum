@@ -48,3 +48,4 @@ OlumJS intentionally has **no naked braces** and **one way** to do each thing. T
 | `each="i of state.n"` | `each="i of Array.from({length: state.n}, (_, k) => k + 1)"` | numeric range needs a literal number |
 | two `onMount(…)` calls | one call, one combined cleanup | only the first call is wired |
 | `params()` called twice | destructure once at top level | only the first call is compiled |
+| `push("/shop?tab=" + tab)` to keep a filter in the URL | `setSearchParam("tab", tab)` | `push()` renders the page again and resets its state; `setSearchParam()` only updates the URL ([details](/docs/programmatic-navigation#updating-the-query-without-rendering)) |
