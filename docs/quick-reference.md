@@ -123,7 +123,7 @@ app.destroy();                 // runs every cleanup, restores <head>, empties t
   </script>
 </head>
 <!-- merges over public/index.html: same slot replaces in place, new tags append -->
-<!-- applied at mount only; every route mount restores the baseline first, so nothing leaks -->
+<!-- re-renders with the page (follows state); every route mount restores the baseline first, so nothing leaks -->
 ```
 
 :::tip[The design principle]

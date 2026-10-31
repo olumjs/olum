@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.12.1",
+    version: "0.12.2",
     framework: "OlumJS",
     app: {},
 
@@ -782,6 +782,7 @@ export default (function () {
         forward: router.forward,
         go: router.go,
         extractParams: router.extractParams,
+        searchParams: router.searchParams,
       };
       router.__proto__.rootElm = this.root;
       router.render = (view) => this.useComponent(view);
@@ -989,14 +990,15 @@ export const flushUpdates = () => __olumRT.flushUpdates();
 export const crossfade = (opts) => __olumRT.crossfade(opts);
 export const easings = __olumRT.easings;
 export const transitions = __olumRT.transitions;
-export const params = (path, pathname) =>
-  __olumRT.router.extractParams(path, pathname);
 export const push = (path) => __olumRT.router.push(path);
 export const replace = (path) => __olumRT.router.replace(path);
 export const back = () => __olumRT.router.back();
-export const pathname = () => __olumRT.router.pathname();
 export const forward = () => __olumRT.router.forward();
 export const go = (n) => __olumRT.router.go(n);
+export const params = (path, pathname) =>
+  __olumRT.router.extractParams(path, pathname);
+export const pathname = () => __olumRT.router.pathname();
+export const searchParams = () => __olumRT.router.searchParams();
 
 export const props = (storeKey) => __olumRT.props(storeKey);
 
