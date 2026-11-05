@@ -36,5 +36,6 @@
     "gulp-header": "^2.0.9",
     "gulp-uglify": "^3.0.2",
     "jsdom": "^19.0.0"
-  }
+  },
+  "types": "types/index.d.ts"
 }
