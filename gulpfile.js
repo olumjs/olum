@@ -27,10 +27,9 @@ const minify = name =>
 
 gulp.task("compile:olum", () => minify("olum"));
 gulp.task("compile:vdom", () => minify("vdom"));
-gulp.task("compile:transition", () => minify("transition"));
-gulp.task("compile", gulp.parallel(["compile:olum", "compile:vdom", "compile:transition"]));
+gulp.task("compile", gulp.parallel(["compile:olum", "compile:vdom"]));
 
-gulp.task("copy", () => gulp.src(["./src/olum.js", "./src/vdom.js", "./src/transition.js"]).pipe(header(comment)).pipe(gulp.dest("dist")));
+gulp.task("copy", () => gulp.src(["./src/olum.js", "./src/vdom.js"]).pipe(header(comment)).pipe(gulp.dest("dist")));
 
 gulp.task("version", (done) => {
   const file = "./src/olum.js";

@@ -1,6 +1,6 @@
 {
   "name": "olum",
-  "version": "0.12.3",
+  "version": "0.13.0",
   "description": "The VanillaJS developer’s platform.",
   "main": "dist/olum.js",
   "directories": {
@@ -36,5 +36,6 @@
     "gulp-header": "^2.0.9",
     "gulp-uglify": "^3.0.2",
     "jsdom": "^19.0.0"
-  }
+  },
+  "types": "types/index.d.ts"
 }

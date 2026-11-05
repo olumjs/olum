@@ -4,7 +4,7 @@ let __olumRT;
 
 export default (function () {
   var olum = {
-    version: "0.12.3",
+    version: "0.13.0",
     framework: "OlumJS",
     app: {},
 
