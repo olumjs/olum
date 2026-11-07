@@ -32,5 +32,5 @@ Open the devtools console and edit the field — `user` is logged on each change
   changes.
 
 For a persistent, condition-based break instead of a per-render log, a
-[`watcher`](watchers.md) with a `debugger;` or `console.log` inside is the imperative
+[`watcher`](/docs/watchers) with a `debugger;` or `console.log` inside is the imperative
 alternative.
