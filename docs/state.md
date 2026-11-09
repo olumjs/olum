@@ -4,14 +4,14 @@ group: Reactivity
 order: 30
 ---
 
-Declare reactive state as `const state = { ... }`. **Mutating `state` re-renders** the component — reactivity is deep, so nested objects, arrays, `Map` and `Set` are tracked too.
+Put the data your component shows in `const state = { ... }`. **When you change `state`, the page updates by itself.**
 
 ```html title="Component.html"
 <script>
   const state = { count: 0, user: { name: "Ann" } };
 
-  const inc = () => state.count++;                 // top-level assignment → re-render
-  const rename = () => (state.user.name = "Bo");   // nested mutation → re-render too
+  const inc = () => state.count++;                 // page updates
+  const rename = () => (state.user.name = "Bo");   // nested changes update it too
 </script>
 
 <p>{state.count} — {state.user.name}</p>
@@ -19,61 +19,65 @@ Declare reactive state as `const state = { ... }`. **Mutating `state` re-renders
 ```
 
 :::warn
-Only `state` is reactive. Plain `const` / `let` variables are not tracked.
+Only `state` is reactive. Changing a normal `const` or `let` variable does **not** update the page.
 :::
 
-## Derived values are plain functions
+## Write `state` as a literal object
 
-There is no separate "computed" concept — a derived value is just a **function** you call in the template. Every re-render re-evaluates it, so it always reflects the current state. Derived functions can call each other:
+It must be a top-level `const state = { ... }` with the object written right there. `const state = makeState()` is not detected, so nothing will update.
+
+## Changes at any depth work
+
+Nested objects, arrays, `Map` and `Set` are all tracked:
+
+```js
+state.user.name = "Bo";          // ✓ nested object
+state.user.prefs.theme = "dark"; // ✓ any depth
+state.todos.push(todo);          // ✓ array methods (push, splice, sort, …)
+state.todos[0].done = true;      // ✓ array item
+state.tags.add("new");           // ✓ Map / Set
+```
+
+Other kinds of objects (`Date`, DOM elements, class instances) are **not** tracked. After changing one, assign a **new** value to its key: `state.date = new Date(state.date)`.
+
+:::warn
+Assigning the **same** object back (`state.todos = state.todos`) does nothing, because nothing changed. To force an update, assign a new array or object (`[...state.todos]`, `map`, `filter`, `slice`, `{ ...obj }`).
+:::
+
+## Derived values are just functions
+
+Need a value calculated from state? Write a function and call it in the template. It runs again on every update, so it's always current. Functions can call each other:
 
 ```html title="Component.html"
 <script>
   const state = { count: 1 };
 
-  const doubled = () => state.count * 2;      // derived from state
-  const quadrupled = () => doubled() * 2;     // derived from another derived
+  const doubled = () => state.count * 2;
+  const quadrupled = () => doubled() * 2;
 </script>
 
 <p>{state.count} * 2 = {doubled()}</p>
 <p>{doubled()} * 2 = {quadrupled()}</p>
 ```
 
-## Reactivity is deep
+## Updates are grouped
 
-Nested plain objects, arrays, `Map` and `Set` are tracked too — mutating them in place re-renders just like a top-level assignment:
+Several changes in a row (`state.a++; state.b++`, or one `splice` on a big array) cause **one** update, not many. And the update only [changes what's different](/docs/rendering) on the page. So change `state` in whatever way reads best; there's no speed reason to avoid `push` or `splice`.
 
-```js
-state.user.name = "Bo";          // ✓ nested object — re-renders
-state.user.prefs.theme = "dark"; // ✓ any depth — re-renders
-state.todos.push(todo);          // ✓ in-place array method — re-renders
-state.todos[0].done = true;      // ✓ re-renders
-state.tags.add("new");           // ✓ Map/Set mutators — re-render
-```
-
-Non-plain objects (`Date`, DOM nodes, class instances) are **not** tracked — after changing one, assign it back to its top-level key to re-render.
-
-:::warn
-Re-assigning the **same reference** back (`state.todos = state.todos`) is a no-op — unchanged values are skipped. To force a re-render without mutating, assign a fresh object/array (spread, `map`, `filter`, `slice`, …).
-:::
-
-## Re-renders are batched
-
-[Watchers](/docs/watchers) fire **synchronously, once per mutation**, but **re-renders are batched per microtask**: `state.a++; state.b++` — or an in-place `splice` that shifts many elements — costs a **single** re-render pass, and that pass [patches the DOM in place](/docs/rendering) rather than rebuilding it. Mutate `state` however reads best — including big arrays with `push`/`splice`; there's no perf reason to reach for reassignment or the store.
-
-One consequence: the DOM is **not** updated in the same statement as the write. Code that must read the freshly-rendered DOM immediately after a write can settle pending re-renders explicitly:
+The catch: the page is updated a moment **after** your change, not on the same line. If you need to read the updated page right away (mostly in tests), call `flushUpdates()`:
 
 ```js
 import { flushUpdates } from "olum";
 
 state.count++;
-flushUpdates();                         // settle re-renders NOW (mostly useful in tests)
-host.querySelector("span").textContent; // fresh
+flushUpdates();                         // apply pending updates now
+host.querySelector("span").textContent; // up to date
 ```
 
-`window.olum.flushUpdates()` does the same thing, but the full `window.olum` exists in **development only** — a production build exposes just `window.olum.version` and `window.olum.framework` (for detection tools), so import `flushUpdates` instead.
+:::note
+`window.olum.flushUpdates()` does the same thing, but only in development. In production `window.olum` only has `version` and `framework` (for detection tools), so import `flushUpdates` instead.
+:::
 
-A write to a key the template never reads doesn't schedule a render at all — see [Rendering & Updates](/docs/rendering) for the full update cycle and what survives a patch.
+[Watchers](/docs/watchers) are different: they run immediately, once per change.
 
-## Declare `state` literally
-
-The compiler detects reactive state **syntactically**: it must be a top-level `const state = { ... }` with the object written out in the component. A computed value (`const state = makeState()`) isn't recognized — the object won't be proxied and nothing re-renders.
+Changing a state key that the template never uses doesn't update the page at all. See [Rendering & Updates](/docs/rendering).

@@ -1,13 +1,16 @@
 ---
 title: Component File Structure
 group: Getting Started
-order: 20
+order: 10
 ---
 
-A component is one `.html` file with up to three parts: `<script>` (logic), `<style>` (scoped CSS), and the template (everything else). A **page** component may add a fourth: `<head>` (metadata).
+A component is one `.html` file. It can have three parts:
+
+- `<script>`: your JavaScript (data and functions)
+- `<style>`: your CSS (it only affects this component)
+- everything else: the HTML template
 
 ```html title="Counter.html"
-<!-- Counter.html -->
 <script>
   const state = { count: 0 };
   const inc = () => state.count++;
@@ -23,16 +26,16 @@ A component is one `.html` file with up to three parts: `<script>` (logic), `<st
 </div>
 ```
 
-- `state`, methods, and any consts destructured from [`props()`](/docs/components) are directly available in the template (same closure).
-- `<style>` is automatically **scoped** to the component (the compiler tags the component's elements with a unique attribute).
-- Component **tag names are PascalCase** — that's how the compiler tells a component apart from a normal element.
+The template can use everything declared in `<script>`: `state`, your functions, and names you take from [`props()`](/docs/components).
 
-## Details worth knowing
+## Good to know
 
-- **The filename is the component name.** `CounterCard.html` compiles to the `CounterCard` component — name the file in PascalCase to match the tag.
-- **Every instance renders inside a wrapper `<div>`** created by the runtime — that wrapper is the `host` element you get in [`onMount`](/docs/lifecycle). Keep it in mind when writing CSS around a component tag (e.g. direct-child selectors in the parent).
-- **`<script>` and `<style>` are both optional.** A file with only markup is a perfectly valid static component.
-- **`<head>` is for page files only.** A route component (`page.html` / `not-found.html`) can declare the document's title, description, Open Graph tags and JSON-LD in a `<head>` block, compiled against the same closure as the template. In any other component it is ignored with a build warning. See [Page Metadata & SEO](/docs/metadata).
+- **The file name is the component name.** `CounterCard.html` becomes the `CounterCard` component. Use PascalCase (each word starts with a capital letter).
+- **Component tags are PascalCase too**: `<CounterCard />`. That capital letter is how Olum tells your components apart from normal HTML tags like `<div>`.
+- **`<script>` and `<style>` are optional.** A file with only HTML is a valid component.
+- **`<style>` is scoped** automatically. See [Scoped CSS](/docs/scoped-css).
+- **Each component is wrapped in a `<div>`** that Olum adds. That `<div>` is the [`host`](/docs/lifecycle) element. Keep it in mind when you write CSS like `.parent > .child` around a component.
+- **Page files can also have a `<head>`.** Only route files (`page.html` and `not-found.html`) may set the page title, description and other meta tags. In any other component, `<head>` is ignored and the build prints a warning. See [Page Metadata & SEO](/docs/metadata).
 
 ```html title="src/blog/[slug]/page.html"
 <head>

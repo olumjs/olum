@@ -1,12 +1,12 @@
 ---
 title: Attributes
 group: Template Syntax
-order: 110
+order: 70
 ---
 
-## String attributes — default
+## Normal attributes: text with `{ }` inside
 
-A literal string; use `{expr}` **inside** for dynamic parts. Native HTML keeps working untouched.
+Write attributes like in plain HTML. Add `{expr}` **inside the quotes** for the parts that change:
 
 ```html title="Component.html"
 <div class="card {state.active ? 'is-active' : ''}"></div>
@@ -14,22 +14,26 @@ A literal string; use `{expr}` **inside** for dynamic parts. Native HTML keeps w
 <img src="/avatars/{state.user.id}.png" alt="avatar" />
 <input id="field-{state.index}" type="text" />
 
-<!-- dynamic inline style is just a string with {expr} (kebab-case CSS) -->
+<!-- inline style is just text too (use CSS names like background-color) -->
 <div style="color:{state.color}; background:{state.bg}; padding:8px;">box</div>
 ```
 
-## Code attributes — value is an expression
+## Code attributes: no `{ }` needed
 
-`when`, `each`, `key`, `on*`, and `html` evaluate their `""` value as JS (covered in their own sections).
+A few attributes hold JavaScript directly: `when`, `each`, `key`, `on*` (events) and `html`. Each has its own page.
 
 ```html title="Component.html"
 <if when="state.count > 0"> … </if>
 <button onclick="inc()">+</button>
 ```
 
-## Boolean attributes — presence, not value
+:::tip[The one rule to remember]
+Is the attribute **code** or **text**? HTML already tells you: `onclick=""` is code, `class=""` is text. Code attributes (`when`, `each`, `key`, `on*`, `html`) take JavaScript directly. Everything else is text, with `{ }` for the parts that change.
+:::
 
-For HTML's boolean attributes the browser only checks **presence** (`checked="false"` is still checked). So when the whole value is a single `{expr}`, the compiler emits the attribute when the expression is truthy and omits it entirely when falsy:
+## Boolean attributes
+
+For attributes like `disabled` or `checked`, the browser only checks if the attribute **exists**: `checked="false"` is still checked! So when the whole value is one `{expr}`, Olum **adds** the attribute when it's truthy and **removes** it when it's falsy:
 
 ```html title="Component.html"
 <button disabled="{state.busy}">Save</button>
@@ -37,12 +41,12 @@ For HTML's boolean attributes the browser only checks **presence** (`checked="fa
 <details open="{state.expanded}">…</details>
 ```
 
-Recognized names: `checked`, `disabled`, `selected`, `readonly`, `required`, `hidden`, `autofocus`, `multiple`, `open`, `loop`, `muted`, `controls`, `autoplay`, `novalidate`, `default`, `defer`, `ismap`, `reversed`.
+This works for: `checked`, `disabled`, `selected`, `readonly`, `required`, `hidden`, `autofocus`, `multiple`, `open`, `loop`, `muted`, `controls`, `autoplay`, `novalidate`, `default`, `defer`, `ismap`, `reversed`.
 
 :::note
-The toggle only applies when the value is **exactly one** `{expr}` — a mixed value like `checked="a {b}"` is meaningless for a boolean attribute.
+The value must be **exactly one** `{expr}`. Something like `checked="a {b}"` makes no sense for a boolean attribute.
 :::
 
-## Asset URLs start with `/`
+## File URLs start with `/`
 
-`src`, `href`, and CSS `url()` values pointing at files in `public/` must be **root-absolute** — `/assets/logo.svg`, never `assets/logo.svg`. Relative URLs resolve against the current route and 404 in production — see [Static Assets](/docs/static-assets).
+`src`, `href` and CSS `url()` pointing to files in `public/` must start with `/`: write `/assets/logo.svg`, never `assets/logo.svg`. Otherwise they break in production. See [Static Assets](/docs/static-assets).

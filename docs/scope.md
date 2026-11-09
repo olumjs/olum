@@ -1,48 +1,42 @@
 ---
 title: Props & Methods Scope
 group: Components
-order: 160
+order: 210
 ---
 
-A component's top-level `const` props and methods are **private by default** — encapsulated to the component. Add scope attributes to the `<script>` opening tag to selectively make them public.
+By default, everything inside a component's `<script>` is **private**: other code can't see it. You can make parts of it **public**, so [`scope()`](#reading-a-component-from-outside-scope) can read them from outside.
+
+:::note
+On this page, **"props"** means a component's top-level `const` values (not the `props()` a parent passes in), and **"methods"** means its functions.
+:::
+
+- **Props**: top-level `const`s with a simple value (a literal, object, array, ternary, or another name).
+- **Methods**: top-level functions (`function fn() {}` or `const fn = () => …`).
+- Anything else (like `const x = compute()`) still works inside the component, it just can't be made public.
+- `state` counts as a prop.
+
+## Making things public
+
+Add a keyword to the `<script>` tag:
 
 ```html title="Component.html"
-<!-- No scope attributes → every prop and method is PRIVATE (encapsulated). -->
-<script>
-  const name  = "Ann";
-  const age   = 30;
-  const greet = () => "Hi " + name;
-</script>
-```
+<script public> … </script>            <!-- all props AND methods public -->
+<script public-props> … </script>      <!-- only props public -->
+<script public-methods> … </script>    <!-- only methods public -->
 
-## Visibility keywords
-
-Six keywords toggle whole groups. The bare `public` / `private` forms apply to **both** props and methods; the `-props` / `-methods` forms target one dimension.
-
-```html title="Component.html"
-<!-- Expose all props AND methods -->
-<script public> … </script>
-
-<!-- Expose all props only (methods stay private) -->
-<script public-props> … </script>
-
-<!-- Expose all methods only (props stay private) -->
-<script public-methods> … </script>
-
-<!-- Explicitly private (the default) — both dimensions -->
-<script private> … </script>
+<script private> … </script>           <!-- everything private (the default) -->
 <script private-props> … </script>
 <script private-methods> … </script>
 ```
 
-## Exceptions — `exclude-*`
+## Exceptions with `exclude-*`
 
-An `exclude-<name>` attribute carves an exception out of the **currently open** visibility group — it flips that one member to the opposite visibility:
+`exclude-<name>` flips **one** item to the opposite of its group:
 
-| Open group | `exclude-x` does |
-|------------|------------------|
-| `public` / `public-props` / `public-methods` | makes `x` private (removed from the public set) |
-| `private` / `private-props` / `private-methods` | makes `x` public (the one member that's surfaced) |
+| After… | `exclude-x` makes `x`… |
+|--------|------------------------|
+| `public`, `public-props`, `public-methods` | private |
+| `private`, `private-props`, `private-methods` | public |
 
 ```html title="Component.html"
 <script public-props exclude-age exclude-name private-methods exclude-get-age>
@@ -55,25 +49,27 @@ An `exclude-<name>` attribute carves an exception out of the **currently open** 
 </script>
 
 <!--
-  props:   public  EXCEPT age, name   →  role is public; age + name private
-  methods: private EXCEPT getAge      →  getAge is public; getRole private
+  props:   public, except age and name  →  role is public
+  methods: private, except getAge       →  getAge is public
 -->
 ```
 
-## Order matters
+:::tip
+To keep `state` private while other props are public, add `exclude-state` after `public-props`.
+:::
 
-Attributes are read **left to right**. A visibility keyword "opens" a group; every following `exclude-*` attaches to it until the next keyword opens a new group.
+### Order matters
+
+Attributes are read **left to right**. Each keyword starts a group, and the `exclude-*` after it belong to that group until the next keyword:
 
 ```text title="reading order"
-['public-props', 'exclude-age', 'exclude-name',  'private-methods', 'exclude-get-age']
-      ↓               ↓              ↓                 ↓                  ↓
-  open props    →   age      →     name          close props      →    getAge
-                                                  open methods      close methods (end)
+public-props   exclude-age   exclude-name   private-methods   exclude-get-age
+└──────────── props group ───────────────┘  └──────── methods group ───────┘
 ```
 
-## camelCase → kebab-case
+### Write names in kebab-case
 
-HTML attribute names are case-insensitive, so a camelCase prop or method must be written as **kebab-case** in the `exclude-*` name — the compiler converts it back:
+HTML attribute names ignore uppercase, so write camelCase names with dashes. Olum converts them back:
 
 ```text title="naming"
 getAge    →  exclude-get-age
@@ -81,30 +77,24 @@ userName  →  exclude-user-name
 isActive  →  exclude-is-active
 ```
 
-:::tip
-Reactive `state` is governed by the **props** scope. Exclude the whole reactive object with `exclude-state` under a public-props group to keep it private.
-:::
+## Reading a component from outside: `scope()`
 
-## Reading the public surface — `scope()`
-
-The consumer of these visibility rules is `scope()`, imported from `olum`: it reaches a **mounted** component by name from anywhere — another component, devtools, a test:
+`scope()` finds a component **on the page** by name, from anywhere (another component, the console, a test):
 
 ```js
 import { scope } from "olum";
 
 const badge = scope("StatusBadge");
-badge.props;    // the PUBLIC props (per the rules above)
-badge.methods;  // the PUBLIC methods
-badge.state;    // the live state proxy — writing to it re-renders that component
-badge.el;       // the component's root element
-badge.key;      // its runtime instance key
+badge.props;    // its PUBLIC props
+badge.methods;  // its PUBLIC methods
+badge.state;    // its live state (changing it updates that component)
+badge.el;       // its root element
+badge.key;      // its internal instance key
 ```
 
-- Several instances mounted? Pass the occurrence index: `scope("Item", 2)`.
-- No match → returns `null` and logs a console warning.
-
-What counts as a prop or method: **props** are top-level `const`s with a simple initializer (a literal, object, array, ternary, or another name); **methods** are top-level function declarations or `const fn = () => …`. Anything else (e.g. `const x = compute()`) isn't part of the scoped surface — it still works inside the component, it just isn't exposed.
+- Several on the page? Pass which one: `scope("Item", 2)`.
+- Not found → returns `null` and logs a warning.
 
 :::tip
-`scope()` is an escape hatch. For state that several components share by design, prefer the [global store](/docs/global-store).
+`scope()` is an escape hatch. For data that several components share on purpose, use the [global store](/docs/store/global-store).
 :::

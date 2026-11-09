@@ -1,10 +1,10 @@
 ---
 title: Components & Props
 group: Components
-order: 130
+order: 160
 ---
 
-Use a component by its **PascalCase** tag. Import it in `<script>`.
+Import a component in `<script>`, then use it as a **PascalCase** tag. Attributes you give it are its **props**:
 
 ```html title="Parent.html"
 <script>
@@ -17,77 +17,47 @@ Use a component by its **PascalCase** tag. Import it in `<script>`.
 <CounterCard title="Counter" initialValue="{state.score}" />
 ```
 
-## Props rule
-
-A prop is a **literal string by default**; a whole-value `prop="{expr}"` passes the expression's **real value/type**; `{}` inside text yields an interpolated string.
+## Passing props
 
 ```html title="Parent.html"
 <Comp
-  title="Hello"               <!-- "Hello"     → string                -->
-  count="{n + 1}"             <!-- 6           → number (type kept)    -->
-  data="{state.user}"         <!-- {...}       → object (type kept)    -->
-  greet="Hi {state.name}"     <!-- "Hi Ann"    → interpolated string   -->
+  title="Hello"               <!-- "Hello"   → text                         -->
+  count="{n + 1}"             <!-- 6         → a real number                -->
+  data="{state.user}"         <!-- {...}     → the real object              -->
+  greet="Hi {state.name}"     <!-- "Hi Ann"  → text with a value inside     -->
 />
 ```
 
+- Plain value → **text**.
+- Only `{expr}` and nothing else → the **real value** (number, object, array, function…).
+- Text mixed with `{expr}` → **text**.
+
+:::note
+There is no spread shortcut (`<Comp {...obj} />`). Pass each field: `<Info name="{pkg.name}" version="{pkg.version}" />`.
+:::
+
+Prop names must be simple names in camelCase (letters, digits, `_`). A dashed name like `data-x="1"` doesn't work on a component (the dash cuts the name). Keep dashed attributes for normal HTML tags.
+
 ## Reading props in the child
 
-`props()` is imported from `olum` and returns this instance's current props. Call it directly at the **top level** of `<script>` — no `onMount()` required.
+Import `props` from `olum` and take what you need, at the **top** of `<script>`:
 
 ```html title="StatusBadge.html"
-<!-- StatusBadge.html -->
 <script>
   import { props } from "olum";
-  const { label, color } = props(); // destructured names stay LIVE — see below
+  const { label, color } = props();
 </script>
+
 <span class="badge" style="color:{color}">{label}</span>
 ```
 
-:::note
-Destructuring from `props()` is a **compiler feature** in OlumJS. The compiler rewrites destructured prop variables into live property accesses, so they always reflect the latest prop values.
-:::
+These names **always have the latest value**. When the parent passes a new value, `label` and `color` update everywhere: in the template, in functions, in event handlers. (Olum turns each use into a fresh `props().label` read for you. Writing `props().label` yourself works too.)
 
-Concretely: every use of `label`/`color` — in templates, methods, and event handlers alike — compiles into a fresh `props().label` / `props().color` read, so the names stay current after the parent re-renders. Writing `props().color` directly is equivalent; use whichever reads better.
+### Default values
 
-### What stays live
-
-```js
-const { color } = props();               // ✓ live everywhere: template, methods, handlers
-const { color: c } = props();            // ✓ alias — c reads the parent's `color`
-const { size = "md" } = props();         // ✓ default when the parent omits it
-const { theme: t = "dark" } = props();   // ✓ alias + default combined
-const { children } = props();            // ✓ slot content — live too
-const { onChange } = props();            // ✓ function props — live callback
-```
-
-Liveness follows normal scoping: a loop variable (`<for each="color of list">`) or a function parameter with the same name shadows the prop inside that scope — the local wins, exactly like plain JavaScript.
-
-### What keeps a one-time snapshot
-
-A few patterns can't be made live — they compile untouched and keep the value from creation time (never an error, just not fresh):
-
-```js
-const { a, ...rest } = props();          // ✗ rest is a snapshot (a is still live)
-const { user: { name } } = props();      // ✗ nested pattern — snapshot
-const { [key]: v } = props();            // ✗ computed key — snapshot
-onMount(() => {
-  const { a } = props();                 // ✗ not top level of <script> — scoped snapshot
-});
-const p = props();
-const { a } = p;                         // ✗ indirect — destructure props() directly
-const { a, b = a } = props();            // ✗ a default referencing another destructured
-                                         //   prop reads its stale value — keep defaults
-                                         //   self-contained
-```
-
-And since [props are read-only](#props-are-read-only-one-way-data-flow), **don't assign** to a destructured name — `color = "x"` throws `Assignment to constant variable`; change parent-owned values through a callback prop instead.
-
-## Default values
-
-Plain destructuring defaults give a prop a fallback for when the parent omits it:
+Use normal JavaScript defaults for when the parent doesn't pass a prop:
 
 ```html title="Nested.html"
-<!-- Nested.html -->
 <script>
   import { props } from "olum";
   const { answer = "a mystery" } = props();
@@ -100,16 +70,40 @@ Plain destructuring defaults give a prop a fallback for when the parent omits it
 <Nested />                 <!-- The answer is a mystery -->
 ```
 
-:::note
-There is **no spread shorthand** (`<Comp {...obj} />`) — pass each field explicitly: `<Info name="{pkg.name}" version="{pkg.version}" />`.
-:::
+### What stays up to date
 
-## Function props — component events
+```js
+const { color } = props();               // ✓ up to date everywhere
+const { color: c } = props();            // ✓ renamed: c is the parent's `color`
+const { size = "md" } = props();         // ✓ with a default
+const { theme: t = "dark" } = props();   // ✓ renamed + default
+const { children } = props();            // ✓ slot content (see Slots)
+const { onChange } = props();            // ✓ a function prop
+```
 
-A prop can be a **function**. That's how a child talks up to its parent: the parent passes a handler down, the child calls it with any payload.
+A loop variable or function parameter with the same name hides the prop inside that block, just like normal JavaScript.
+
+### What is only read once
+
+These patterns keep the value from when the component was created. They don't error, they just don't update:
+
+```js
+const { a, ...rest } = props();          // ✗ rest is not updated (a still is)
+const { user: { name } } = props();      // ✗ nested: use const { user } = props(), then user.name
+const { [key]: v } = props();            // ✗ computed key: use props()[key]
+onMount(() => {
+  const { a } = props();                 // ✗ not at the top of <script>
+});
+const p = props();
+const { a } = p;                         // ✗ indirect: destructure props() directly
+const { a, b = a } = props();            // ✗ a default that uses another prop gets an old value
+```
+
+## Function props
+
+A prop can be a **function**. That's how a child tells its parent something happened: the parent passes a function, the child calls it.
 
 ```html title="Parent.html"
-<!-- parent -->
 <script>
   import Inner from "./Inner";
   const handleMessage = (payload) => alert(payload.text);
@@ -119,7 +113,6 @@ A prop can be a **function**. That's how a child talks up to its parent: the par
 ```
 
 ```html title="Inner.html"
-<!-- Inner.html -->
 <script>
   import { props } from "olum";
   const { onMessage } = props();
@@ -129,62 +122,54 @@ A prop can be a **function**. That's how a child talks up to its parent: the par
 <button onclick="sayHello()">Click to say hello</button>
 ```
 
-### The value must be a **name**, never an inline function
+### Pass a function name, never inline code
 
-Props cross into the child as **data**, so a function can only travel as a **reference the compiler can look up by name**. Two names resolve: a top-level function of this component, and a name destructured from `props()` (forwarding, below).
+A function prop must be a **name**: either a top-level function of this component, or a name you got from `props()` (to pass it further down).
 
 ```html title="Parent.html"
 <script>
-  import Input from "./Input";          // YOUR component, in Input.html
+  import Input from "./Input";          // YOUR component (Input.html)
   const handleInput = (e) => (state.text = e.target.value);
 </script>
 
-<Input oninput="{handleInput}" />        <!-- ✓ a top-level function of this component -->
+<Input oninput="{handleInput}" />        <!-- ✓ a name -->
+
+<Input oninput="() => console.log(123)" />     <!-- ✗ arrives as the TEXT "() => console.log(123)" -->
+<Input oninput="{() => console.log(123)}" />   <!-- ✗ inline function: arrives as undefined -->
+<Input oninput="{state.handlers.input}" />     <!-- ✗ not a plain name: arrives as undefined -->
+<Input oninput="{makeHandler(id)}" />          <!-- ✗ passes what the call returns, not a function -->
 ```
 
-:::note
-`Input` here is only an example name for a component **you** wrote — read it as any component, `<TextField/>`, `<CounterCard/>`, `<Comp/>`. The capital letter is the whole difference: a **PascalCase** tag is a component and gets props, a **lowercase** tag (`<input/>`, `<button/>`) is the real HTML element and gets DOM events. The two examples below say the same thing with the pair that is easiest to mix up.
-:::
-
-Anything else is **not** a function by the time the child reads it — the compiler does not report it, the child throws `oninput is not a function` when it calls the prop:
-
-```html title="Parent.html"
-<!-- capital I — <Input/> is a COMPONENT of yours, so oninput is a prop, not a DOM event -->
-<Input oninput="() => console.log(123)" />     <!-- ✗ arrives as the STRING "() => console.log(123)" -->
-<Input oninput="{() => console.log(123)}" />   <!-- ✗ inline function — dropped, arrives undefined -->
-<Input oninput="{state.handlers.input}" />     <!-- ✗ not a plain name — dropped, arrives undefined -->
-<Input oninput="{makeHandler(id)}" />          <!-- ✗ passes the call's RESULT, not a function -->
-```
-
-The fix is always the same: give the function a name in `<script>`, then pass the name.
+Olum doesn't warn you. The child fails with `oninput is not a function` when it calls it. The fix is always the same: give the function a name in `<script>` and pass the name.
 
 :::warn
-This rule is for **component** tags (PascalCase) only. Real HTML elements (lowercase) are unchanged — `<input oninput="state.counter++" />` and `<input oninput="e => console.log(123)" />` still work exactly as [Events](/docs/events) describes, because there `on*` is real DOM code, not a prop. Same six letters, opposite rules:
+This rule is **only for your components** (PascalCase). On normal HTML tags (lowercase), `on*` is a real DOM event and inline code is fine ([Events](/docs/events)):
 
 ```html title="Component.html"
-<input oninput="e => console.log(123)" />    <!-- ✓ real <input> element — inline code is fine -->
-<Input oninput="e => console.log(123)" />    <!-- ✗ YOUR <Input/> component — needs a name: "{handler}" -->
+<input oninput="e => console.log(123)" />    <!-- ✓ HTML <input>: inline code works -->
+<Input oninput="e => console.log(123)" />    <!-- ✗ your <Input/> component: needs "{handler}" -->
 ```
+
+Even `onclick` is just a prop on a component: `<CustomButton onclick="{handleClick}" />` gives the child a function, and the child decides when to call it (e.g. from its own `<button onclick="onclick()">`).
 :::
 
-Need a handler that knows about a loop item? You can't pre-bind it in the tag — pass the data down and let the child hand it back:
+**Need the function to know which item it's for?** You can't pre-fill arguments in the tag. Pass the item as a prop and let the child send it back:
 
 ```html title="List.html"
-<!-- ✗ an inline arrow can't bind the row here -->
+<!-- ✗ doesn't work -->
 <for each="row of state.rows" key="row.id">
   <Row onPick="{() => pick(row.id)}" />
 </for>
 
-<!-- ✓ pass the row, let the child call back with it -->
+<!-- ✓ pass the row; the child calls onPick(row.id) -->
 <for each="row of state.rows" key="row.id">
-  <Row row="{row}" onPick="{pick}" />       <!-- child: onPick(row.id) -->
+  <Row row="{row}" onPick="{pick}" />
 </for>
 ```
 
-Forwarding through a middle component is just passing the prop along:
+**Passing it through a middle component** is just passing the prop again:
 
 ```html title="Outer.html"
-<!-- Outer.html — sits between parent and Inner -->
 <script>
   import Inner from "./Inner";
   import { props } from "olum";
@@ -194,7 +179,7 @@ Forwarding through a middle component is just passing the prop along:
 <Inner onMessage="{onMessage}" />
 ```
 
-A function prop also survives being written inside **another component's slot** — the handler is resolved against the component whose template contains the tag, not the one that happens to render it:
+**Inside another component's slot** it still works. The name is looked up in the file where you wrote the tag:
 
 ```html title="Page.html"
 <script>
@@ -203,40 +188,40 @@ A function prop also survives being written inside **another component's slot** 
   const pick = (id) => (state.picked = id);
 </script>
 
-<!-- Card is authored here but instantiated during Section's render — `pick` still arrives -->
 <Section>
-  <Card onPick="{pick}" />
+  <Card onPick="{pick}" />   <!-- `pick` from Page.html arrives fine -->
 </Section>
 ```
 
-:::note
-On a **component** tag, an `on*` name is just a prop like any other — even `onclick`. `<CustomButton onclick="{handleClick}" />` hands the child a function; the child decides when to call it (e.g. from its own `<button onclick="onclick()">`). Only on plain elements is `on*` a real DOM event — which is why `<CustomButton onclick="() => …" />` does **not** work while `<button onclick="() => …">` does.
-:::
+## Props are read-only
 
-## Props are read-only (one-way data flow)
+Data goes **down** through props, and changes go **up** through function props. A child can't change a prop:
 
-Data flows **down** through props; changes flow **up** through callbacks. Assigning to `props().x` does nothing except log a console warning — to change a parent-owned value, the parent passes a **callback prop** and the child calls it:
+- Assigning `props().x = …` does nothing (and logs a warning).
+- Assigning a destructured name (`color = "x"`) throws `Assignment to constant variable`.
 
-```html title="CounterCard.html"
-<!-- parent: owns the value, hands the child a way to request changes -->
+Instead, the parent passes a function the child calls to ask for the change:
+
+```html title="Parent.html"
 <script>
+  import CounterCard from "./CounterCard";
   const state = { score: 0 };
   const setScore = (n) => (state.score = n);
 </script>
-<CounterCard value="{state.score}" onChange="{setScore}" />
 
-<!-- CounterCard.html: reads the prop, calls the callback to update it -->
-<script>
-  import { props } from "olum";
-  const { value, onChange } = props(); // both live — value is always the latest
-  const inc = () => onChange(value + 1);
-</script>
+<CounterCard value="{state.score}" onChange="{setScore}" />
 ```
 
-The owner's `state` assignment triggers the re-render, and the fresh value flows back down as a prop. For a value that **several** components read and write, skip the prop threading entirely and put it in the [global store](/docs/global-store).
+```html title="CounterCard.html"
+<script>
+  import { props } from "olum";
+  const { value, onChange } = props();
+  const inc = () => onChange(value + 1);
+</script>
 
-See the working example at `/forms/callback-props` (a keypad that edits its parent's passcode via `onChange`).
+<button onclick="inc()">{value} +1</button>
+```
 
-## Prop names are identifiers
+The parent updates its `state`, and the new value flows back down to the child. Working example: [`/forms/callback-props`](/forms/callback-props) (a keypad that edits its parent's passcode).
 
-A prop name must be a plain identifier (letters, digits, underscore) — write them in camelCase. A dashed name like `data-x="1"` doesn't parse as you'd expect on a component tag (the dash truncates the name), so reserve dashed attributes for plain elements.
+If **many** components need to read and change the same value, use the [global store](/docs/store/global-store) instead of passing props through every level.

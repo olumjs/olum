@@ -1,43 +1,40 @@
 ---
 title: Scoped CSS
-group: Advanced
-order: 180
+group: Components
+order: 190
 ---
 
-A component's `<style>` is automatically scoped — selectors only affect that component's elements. Just write normal CSS:
+CSS in a component's `<style>` only affects **that component**. Just write normal CSS:
 
 ```html title="Component.html"
 <style>
-  .title { color: #4f46e5; }   /* won't leak to other components */
+  .title { color: #4f46e5; }   /* won't affect other components */
 </style>
 <h1 class="title">Hello</h1>
 ```
 
-Under the hood the compiler tags the component's elements with a unique attribute and rewrites each selector to require it. The attribute attaches to the selector's **last compound** (`p:hover` → `p[data-o-x]:hover`), so a descendant selector like `.card p` still won't reach into a *nested component's* elements — children carry their own scope attribute.
+**How it works:** Olum adds a unique attribute to the component's elements and adds it to each selector (`p:hover` becomes `p[data-o-x]:hover`). Child components have their own attribute, so even `.card p` won't style a `<p>` inside a nested component.
 
-## Opting out — global styles
+## Global styles
 
-A selector starting with `:root`, `html`, or `body` is left **unscoped** on purpose — it's the escape hatch for component-declared global styles:
+Selectors that start with `:root`, `html` or `body` are **not** scoped. Use them when a component needs global CSS:
 
 ```html title="Component.html"
 <style>
-  :root { --brand: #25c97e; }        /* global CSS variable */
-  body { overflow: hidden; }          /* global while this style is present */
+  :root { --brand: #25c97e; }        /* a global CSS variable */
+  body { overflow: hidden; }          /* global while this style is on the page */
   .panel { color: var(--brand); }     /* scoped as usual */
 </style>
 ```
 
-For app-wide styles that belong to no component, prefer `public/main.css`.
+For app-wide styles that don't belong to a component, use `public/main.css`.
 
-## What else the scoper handles
+## Good to know
 
-- **`@keyframes` are per-component** — a keyframes name is renamed to `<name>-<componentName>` (and every `animation` / `animation-name` reference is rewritten to match), so two components can both declare `@keyframes fade` without colliding.
-- **`@media`, `@supports`, `@layer`, `@container`** — the rules inside are scoped normally.
-- **`@font-face`** — left untouched (it has no selector to scope).
-- **CSS comments** are stripped from the output.
-
-## Details worth knowing
-
-- Styles are injected **once per component** into a `<style>` tag in `<head>` (id `olum-style-<Name>`) — the first time any instance renders. Every instance shares it.
-- `url(...)` paths in component CSS must be **root-absolute** (`url(/assets/x.svg)`) — the CSS is injected at runtime, so relative paths resolve against the current route and break. See [Static Assets](/docs/static-assets).
-- Scoping is per **selector**; the declarations are untouched. There is no `:host`-style selector for the component's own wrapper element — style the elements of your template directly.
+- **`@keyframes` are per component.** `@keyframes fade` is renamed to `fade-<ComponentName>` (and your `animation` / `animation-name` are updated to match), so two components can both have a `fade` without clashing.
+- **`@media`, `@supports`, `@layer`, `@container`**: the rules inside are scoped as usual.
+- **`@font-face`** is left as is.
+- **CSS comments** are removed.
+- Styles are added **once per component** as a `<style id="olum-style-<Name>">` in `<head>`, the first time it appears. All copies of the component share it.
+- `url(...)` must start with `/` (`url(/assets/x.svg)`), otherwise it breaks on nested pages. See [Static Assets](/docs/static-assets).
+- There is no `:host` selector for the component's wrapper `<div>`. Style your own elements directly.

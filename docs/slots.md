@@ -1,33 +1,33 @@
 ---
 title: Slots
 group: Components
-order: 140
+order: 170
 ---
 
-Content placed between a component's tags is exposed as `children` on `props()`.
+Anything you put **between** a component's tags reaches the child as `children`:
 
-```html title="CounterCard.html"
-<!-- parent -->
+```html title="Parent.html"
 <CounterCard title="Score">
   <em>passed from the parent</em>
 </CounterCard>
+```
 
-<!-- CounterCard.html -->
+```html title="CounterCard.html"
 <script>
   import { props } from "olum";
-  const { children } = props(); // stays LIVE — compiled into a fresh props().children read
+  const { children } = props();
 </script>
+
 <div class="slot">{children}</div>
 ```
 
-Destructured names are [live](/docs/components): `{children}` always renders the **latest** slot content, even after the parent re-renders and passes different content. `{props().children}` is equivalent.
+Like other props, `children` is [always up to date](/docs/components#reading-props-in-the-child): if the parent passes different content later, `{children}` shows the new one. `{props().children}` works too.
 
 ## Fallback content
 
-`children` is empty when the parent passed nothing between the tags — render a fallback with `<if>` / `<else>`:
+`children` is empty when nothing was passed. Use `<if>` / `<else>` to show a fallback:
 
 ```html title="Box.html"
-<!-- Box.html -->
 <script>
   import { props } from "olum";
   const { children } = props();
@@ -40,10 +40,10 @@ Destructured names are [live](/docs/components): `{children}` always renders the
 ```
 
 ```html title="Parent.html"
-<Box><p>This is a box.</p></Box>   <!-- renders the slot content -->
-<Box />                            <!-- renders the fallback -->
+<Box><p>This is a box.</p></Box>   <!-- shows the paragraph -->
+<Box />                            <!-- shows the fallback -->
 ```
 
 :::note
-Slot content is injected as **raw markup**, not escaped text — it's authored by the parent template, so it's trusted by design. Don't route untrusted strings through a slot; see [Escaping & Security](/docs/security).
+Slot content is inserted as **real HTML**, not escaped text, because it comes from your own template. Never pass untrusted text through a slot. See [Escaping & Security](/docs/security).
 :::

@@ -1,14 +1,15 @@
 ---
 title: Escaping & Security
 group: Advanced
-order: 200
+order: 250
 ---
 
-OlumJS escapes by default to prevent XSS. Opt out deliberately when you need raw HTML.
+Olum protects you from XSS (injected scripts) by default: every value is escaped unless you opt out on purpose.
 
-- **Default:** every text/attribute `{expr}` is HTML-escaped via `olum.esc` (prevents XSS and "special characters break the page" bugs).
-- **Opt out** (trusted HTML only): `html="expr"` (element) or `olum.html(value)` (inline). Both are the deliberate, greppable bypass.
+- **By default**, every `{expr}` in text and attributes is HTML-escaped (with `olum.esc`). So `<script>` in user data shows as text and can't run, and characters like `<` or `"` can't break your page.
+- **To insert real HTML** (trusted content only), use `html="expr"` on an element or `olum.html(value)` inline. See [Raw HTML](/docs/raw-html).
+- **Slot content** (`children`) is inserted as HTML, because it comes from your own template. See [Slots](/docs/slots).
 
 :::danger{icon="🔒"}
-Never pass untrusted user content to `html=` or `olum.html()`. Sanitize first if you must render user-supplied HTML.
+Never pass user content to `html=` or `olum.html()`. If you must show user-supplied HTML, sanitize it first.
 :::

@@ -1,10 +1,10 @@
 ---
 title: Lifecycle Hooks
-group: Advanced
-order: 190
+group: Components
+order: 180
 ---
 
-Import `onMount` from `olum` and call it with a callback. The callback runs when the component mounts; return a function from it to run cleanup on unmount.
+`onMount` runs your code when the component **appears on the page**. If you return a function, it runs when the component is **removed** (the "cleanup").
 
 ```html title="Component.html"
 <script>
@@ -13,15 +13,21 @@ Import `onMount` from `olum` and call it with a callback. The callback runs when
   onMount(() => {
     console.log("mounted");
     return () => {
-      console.log("unMounted");
+      console.log("removed");
     };
   });
 </script>
 ```
 
-- The `onMount` callback runs when the component is inserted into the DOM.
-- The **returned cleanup function** runs when it's removed (e.g. an `<if>` toggles it off, or a keyed list item is removed), and for every mounted component when the whole app is torn down with [`app.destroy()`](/docs/embedding) (embedding is under maintenance).
-- The callback can be `async` — the usual place to fetch initial data:
+The cleanup runs when the component is removed (an `<if>` turns false, a keyed list item is deleted, the route changes) and when the whole app is shut down with [`app.destroy()`](/docs/embedding) (embedding is under maintenance).
+
+:::warn
+Call `onMount` **once** per component. A second call is ignored. Put all your setup in one callback and return one cleanup.
+:::
+
+## Loading data
+
+The callback can be `async`. It's the usual place to fetch data:
 
 ```html title="Component.html"
 <script>
@@ -36,7 +42,9 @@ Import `onMount` from `olum` and call it with a callback. The callback runs when
 </script>
 ```
 
-Timers, `requestAnimationFrame` loops, and global `window` / `document` listeners belong in `onMount` too — start them in the callback, stop them in the cleanup:
+## Timers and global listeners
+
+Start timers, `requestAnimationFrame` loops and `window` / `document` listeners in `onMount`, and stop them in the cleanup:
 
 ```html title="Component.html"
 <script>
@@ -55,19 +63,9 @@ Timers, `requestAnimationFrame` loops, and global `window` / `document` listener
 
 ## `host`
 
-Inside `onMount`, `host` refers to this component's own root DOM element — no import needed. Use it to query within the component instead of `document.querySelector`, which could match another instance or an unrelated element elsewhere on the page.
+`host` is this component's own wrapper element. No import needed. Use `host.querySelector(…)` instead of `document.querySelector(…)`, which could find an element in another copy of the component or elsewhere on the page.
 
-```html title="Component.html"
-<script>
-  import { onMount } from "olum";
-
-  onMount(() => {
-    const main = host.querySelector("main");
-  });
-</script>
-```
-
-Observers and hand-wired element listeners follow the same shape — start in the callback, stop in the cleanup:
+It's ready in `onMount` and in event handlers (anything that runs after the component is on the page), but **not** at the top level of `<script>`.
 
 ```html title="Box.html"
 <script>
@@ -92,10 +90,10 @@ Observers and hand-wired element listeners follow the same shape — start in th
 <div class="box">…</div>
 ```
 
-The same shape covers a `<canvas>` drawing loop, a `<video>` you follow with `requestAnimationFrame` (`onplay`, `onpause` and `onloadedmetadata` also work inline — `onMount` is only needed for the loop and for state the element owns, like `video.currentTime`), and events the compiler does not know inline, such as `copy` or `paste` — see [Events](/docs/events).
+The same start/stop pattern works for:
 
-Working examples: [`/forms/host-element`](/forms/host-element) (canvas), [`/forms/dimensions`](/forms/dimensions) (ResizeObserver), [`/forms/media-elements`](/forms/media-elements) (a video player).
+- a `<canvas>` drawing loop
+- a `<video>` you follow with `requestAnimationFrame` (`onplay`, `onpause` and `onloadedmetadata` work as normal attributes; you only need `onMount` for the loop and for things like `video.currentTime`)
+- events that can't be written as attributes, like `copy` or `paste` (see [Events](/docs/events#events-you-must-add-by-hand))
 
-:::warn
-Call `onMount` **once** per component — only the first call is wired; a second call is silently ignored. Put all setup in the one callback and return one combined cleanup.
-:::
+Examples: [`/forms/host-element`](/forms/host-element) (canvas), [`/forms/dimensions`](/forms/dimensions) (ResizeObserver), [`/forms/media-elements`](/forms/media-elements) (video player).

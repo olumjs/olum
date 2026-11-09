@@ -1,34 +1,31 @@
 ---
 title: Events
 group: Template Syntax
-order: 90
+order: 110
 ---
 
-Native `on*` attributes hold **code** (like real HTML). Two forms:
+Events work like in plain HTML: `onclick=""`, `oninput=""` and friends hold **code**.
 
 ```html title="Component.html"
-<!-- method call(s) -->
+<!-- call a function (or several) -->
 <button onclick="inc()">+</button>
-<button onclick="inc(), log()">multi</button>
+<button onclick="inc(), log()">both</button>
 
-<!-- inline arrow / function (extracted into a method automatically) -->
+<!-- write an arrow function right there -->
 <input oninput="(e) => state.text = e.target.value" />
-<button onclick="e => state.n++">no-paren arrow</button>
-```
+<button onclick="e => state.n++">no parentheses needed</button>
 
-Pass the DOM event with `$event`:
-
-```html title="Component.html"
+<!-- $event is the DOM event -->
 <input oninput="setValue($event)" />
 ```
 
 :::note
-Event modifiers (`mode="prevent"`, `stop`, …) are **not** a feature — do it in the handler: `onsubmit="(e)=> { e.preventDefault(); save() }"`.
+There are no event modifiers like `mode="prevent"` or `stop`. Do it in your code: `onsubmit="(e) => { e.preventDefault(); save() }"`.
 :::
 
 ## Several events on one element
 
-An element can carry as many `on*` attributes as you need — each is wired as its own listener:
+Use as many `on*` attributes as you need:
 
 ```html title="Component.html"
 <input oninput="draft($event)" onblur="save()" onkeydown="hotkey($event)" />
@@ -38,11 +35,11 @@ An element can carry as many `on*` attributes as you need — each is wired as i
 </div>
 ```
 
-Across re-renders a listener is **kept** as long as its binding is unchanged; it's only swapped when the handler — or a value baked into it, like a loop variable — actually changes. Reach for [`onMount`](/docs/lifecycle) only for listeners that aren't on one of your own elements (`window`, `document`) or that need options like `capture` / `passive`.
+Listeners are kept between updates and only replaced when the handler (or a value inside it, like a loop variable) changes. Only use [`onMount`](/docs/lifecycle) for listeners on `window` / `document`, or ones that need options like `capture` / `passive`.
 
 ## Loop variables just work
 
-A handler written inside a [`<for>`](/docs/loops) can reference the loop variables directly — the per-item value is captured for you, in method calls and inline arrows alike:
+Inside a [`<for>`](/docs/loops), handlers can use the loop variable directly:
 
 ```html title="Component.html"
 <for each="flavour of state.menu">
@@ -51,47 +48,39 @@ A handler written inside a [`<for>`](/docs/loops) can reference the loop variabl
 </for>
 ```
 
-:::note
-The recognized `on*` names are the standard DOM events (`onclick`, `oninput`, `onchange`, `onkeydown`, …). Everything on this page — inline arrows, bare expressions, `$event` — is for **plain elements**.
+## Events on your components are different
 
-On a **component** tag — any PascalCase tag you import, `<Input/>`, `<TextField/>`, `<Comp/>` — the same `on*` name is a [function prop](/docs/components) instead, and a function prop takes a **name only**:
+Everything above is for **normal HTML tags** (lowercase, like `<input>`). On **your own components** (PascalCase, like `<Input/>`), an `on*` attribute is a [function prop](/docs/components#function-props), and it only accepts a function **name** in `{ }`:
 
 ```html title="Component.html"
-<input oninput="e => console.log(123)" />    <!-- ✓ the real HTML element: inline code -->
+<input oninput="e => console.log(123)" />    <!-- ✓ HTML tag: code is fine -->
 <Input oninput="{handleInput}" />            <!-- ✓ your component: a name -->
 <Input oninput="e => console.log(123)" />    <!-- ✗ arrives as a string, never runs -->
 <Input oninput="{e => console.log(123)}" />  <!-- ✗ arrives as undefined -->
 ```
 
-Only the capital letter separates the two.
-:::
+Only the capital letter tells them apart.
 
-## Keyboard events
+## Keyboard
 
-`keydown` fires first, and it is the only one you can `preventDefault()` to stop the character from being typed. `keyup` fires last. `keypress` is legacy — it never sees keys like `Escape` or the arrows.
+- `keydown` fires first. It's the only one where `preventDefault()` stops the character from being typed.
+- `keyup` fires last.
+- `keypress` is old: it never sees keys like `Escape` or the arrows.
 
 ```html title="TagInput.html"
 <script>
   const state = { draft: "", tags: ["olum", "forms"] };
 
-  const addTag = () => {
-    const tag = state.draft.trim();
-    if (!tag || state.tags.includes(tag)) return;
-    state.tags = state.tags.concat(tag);
-    state.draft = "";
-  };
-
   const handleKeydown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      addTag();
+      if (state.draft.trim()) state.tags.push(state.draft.trim());
+      state.draft = "";
     }
     if (e.key === "Escape") state.draft = "";
-    if (e.key === "Backspace" && !state.draft && state.tags.length) {
-      state.tags = state.tags.slice(0, -1);          // remove the last tag
-    }
+    if (e.key === "Backspace" && !state.draft) state.tags.pop();   // remove the last tag
     if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();                            // caught here, not by the browser
+      e.preventDefault();                                          // stop the browser's "save page"
       save();
     }
   };
@@ -104,19 +93,19 @@ Only the capital letter separates the two.
 />
 ```
 
-Useful fields on the event: `e.key` (the character or name), `e.code` (the physical key), `e.ctrlKey` / `e.shiftKey` / `e.altKey` / `e.metaKey`, and `e.repeat` (the key is held down). Example: [`/forms/keyboard-events`](/forms/keyboard-events).
+Useful event fields: `e.key` (the character or key name), `e.code` (the physical key), `e.ctrlKey` / `e.shiftKey` / `e.altKey` / `e.metaKey`, and `e.repeat` (the key is held down). Example: [`/forms/keyboard-events`](/forms/keyboard-events).
 
 ## Focus, blur and selection
 
 ```html title="Profile.html"
 <script>
-  const state = { focused: "", touched: {}, selection: "" };
+  const state = { nickname: "", focused: "", touched: {}, selection: "" };
 
   const onFocus = (e) => (state.focused = e.target.name);
 
   const onBlur = (e) => {
     state.focused = "";
-    state.touched = { ...state.touched, [e.target.name]: true };   // show errors only after a blur
+    state.touched[e.target.name] = true;   // e.g. show errors only after the user leaves the field
   };
 
   const onSelect = (e) => {
@@ -141,14 +130,14 @@ Useful fields on the event: `e.key` (the character or name), `e.code` (the physi
 ```
 
 :::warn
-`focus` and `blur` do **not** bubble — put them on the field itself, never on a wrapper. (`focusin` / `focusout` do bubble, but the compiler does not know them — see below.)
+`focus` and `blur` don't bubble up to parent elements. Put them on the field itself, not on a wrapper.
 :::
 
-There are no element refs in Olum: reach a field with `host.querySelector(…)`, as the button above does ([`host`](/docs/lifecycle)). Example: [`/forms/focus-and-selection`](/forms/focus-and-selection).
+To reach an element from code, use `host.querySelector(…)` like the button above ([`host`](/docs/lifecycle#host)). Example: [`/forms/focus-and-selection`](/forms/focus-and-selection).
 
 ## Drag and drop
 
-`dragover` **must** call `preventDefault()`, or the browser refuses the drop and opens the file instead:
+`dragover` **must** call `preventDefault()`, otherwise the browser refuses the drop (and opens the file instead):
 
 ```html title="Dropzone.html"
 <script>
@@ -162,7 +151,7 @@ There are no element refs in Olum: reach a field with `host.querySelector(…)`,
   const onDrop = (e) => {
     e.preventDefault();
     state.over = false;
-    state.files = Array.from(e.dataTransfer.files);   // same FileList a file input gives you
+    state.files = Array.from(e.dataTransfer.files);   // same as a file input's files
   };
 </script>
 
@@ -177,7 +166,7 @@ There are no element refs in Olum: reach a field with `host.querySelector(…)`,
 </div>
 ```
 
-To reorder a list, put `draggable="true"` on each row and move the item in the array. Add [`key`](/docs/loops) so each row keeps its own DOM while the array is reordered:
+To reorder a list, add `draggable="true"` to each row and move the item in the array. Add a [`key`](/docs/loops#keys-add-one-when-items-can-move) so each row keeps its own element:
 
 ```html title="Sortable.html"
 <for each="(item, index) of state.items" key="item">
@@ -195,9 +184,9 @@ To reorder a list, put `draggable="true"` on each row and move the item in the a
 
 Example: [`/forms/drag-and-drop`](/forms/drag-and-drop).
 
-## Events the compiler does not know
+## Events you must add by hand
 
-`copy`, `cut`, `paste`, `beforeinput`, `focusin` and `focusout` are **not** in the inline `on*` list. Wire them by hand in [`onMount`](/docs/lifecycle) on the element you get from `host`, and remove them in the returned cleanup:
+`copy`, `cut`, `paste`, `beforeinput`, `focusin` and `focusout` **can't** be written as `on*` attributes. Add them in [`onMount`](/docs/lifecycle) and remove them in the cleanup:
 
 ```html title="Note.html"
 <script>
@@ -224,4 +213,6 @@ Example: [`/forms/drag-and-drop`](/forms/drag-and-drop).
 <textarea name="note" value="{state.text}" oninput="(e) => state.text = e.target.value"></textarea>
 ```
 
-Writing to the clipboard is an API call, not an event — `navigator.clipboard.writeText(state.text)` returns a promise the browser may reject. The same manual pattern covers `window` / `document` listeners and options like `capture` or `passive`. Example: [`/forms/clipboard-events`](/forms/clipboard-events).
+The same pattern works for `window` / `document` listeners and for `capture` / `passive` options.
+
+To **write** to the clipboard, call `navigator.clipboard.writeText(state.text)`. It returns a promise, and the browser may refuse. Example: [`/forms/clipboard-events`](/forms/clipboard-events).

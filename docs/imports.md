@@ -1,10 +1,10 @@
 ---
 title: Imports
 group: Components
-order: 150
+order: 200
 ---
 
-Import child components (and any JS) in `<script>`. Import a component by its file name (the `.html` compiles to `.js`):
+Import components and any JavaScript in `<script>`, like in a normal JS module:
 
 ```html title="Component.html"
 <script>
@@ -12,3 +12,5 @@ Import child components (and any JS) in `<script>`. Import a component by its fi
   import { formatDate } from "./utils";
 </script>
 ```
+
+Import a component by its file name **without** `.html` (each `.html` file is compiled to a `.js` file).

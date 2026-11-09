@@ -1,10 +1,10 @@
 ---
 title: Conditionals
 group: Template Syntax
-order: 60
+order: 80
 ---
 
-`when` is always a JS expression. The element is **added/removed** from the DOM.
+Show different HTML depending on a condition. `when` takes a JavaScript expression (no `{ }` needed):
 
 ```html title="Component.html"
 <if when="state.tab === 'a'">
@@ -18,8 +18,10 @@ order: 60
 </else>
 ```
 
-Comparison operators work as expected:
+Any JavaScript condition works:
 
 ```html title="Component.html"
 <if when="state.count >= 5 && state.count < 10">in range</if>
 ```
+
+When the condition is false, the content is **removed** from the page. To only hide it instead, use [`<show>`](/docs/show).

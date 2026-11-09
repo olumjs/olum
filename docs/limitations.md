@@ -1,21 +1,18 @@
 ---
 title: Limitations
 group: Advanced
-order: 220
+order: 270
 ---
 
-OlumJS is deliberately small, and a few rough edges come with that. Here's what to watch for today — each has a straightforward workaround by design.
+Olum is small on purpose, so a few things are missing. Each has a simple workaround.
 
-## 1. Unkeyed loop reorders match nodes by position
+## 1. Lists without `key` match rows by position
 
-An unkeyed `<for>` matches nodes by position. If a loop reorders its items, positional matching repaints each node in place with a neighbour's data, so the node's live state appears to jump to the wrong row. Add [`key`](/docs/loops) and nodes are matched by identity and moved instead — see [Rendering & Updates](/docs/rendering).
+If an unkeyed `<for>` list is reordered, rows are repainted with their neighbour's data, so things like a checked box seem to jump to the wrong row. Add [`key`](/docs/loops#keys-add-one-when-items-can-move) and rows are moved instead. See [Rendering & Updates](/docs/rendering#keys-which-element-is-which).
 
 ## 2. No element refs or actions
 
-There is no `bind:this` and no `use:action` directive. (There **is** a transition/animation
-system — see [Transitions](/docs/transitions) for `<transition>`, `flip`, and `crossfade`.) The
-workaround for refs and actions is the same: do it imperatively in [`onMount`](/docs/lifecycle),
-using `host` to reach this component's own elements, and return a cleanup:
+There's no `bind:this` and no `use:action`. Do it yourself in [`onMount`](/docs/lifecycle), use `host` to find the element, and return a cleanup:
 
 ```html title="Component.html"
 <script>
@@ -23,20 +20,22 @@ using `host` to reach this component's own elements, and return a cleanup:
   import { longpress } from "./longpress.js";
 
   onMount(() => {
-    const button = host.querySelector("button");   // "ref" via host
-    const action = longpress(button, 2000);        // "action" wired by hand
-    return () => action.destroy();                 // cleanup on unmount
+    const button = host.querySelector("button");   // the "ref"
+    const action = longpress(button, 2000);        // the "action"
+    return () => action.destroy();                 // cleanup when removed
   });
 </script>
 
 <button>press and hold</button>
 ```
 
-`onMount` runs once at mount and its cleanup once at unmount — it does **not** re-run on state changes. Because re-renders [patch in place](/docs/rendering), the element you wired stays the same node, so the behavior keeps working. If it needs to react to new state, read that state inside the action's own handlers.
+`onMount` runs once, not on every update. That's fine: updates [change elements in place](/docs/rendering), so the button stays the same element and keeps working. If the behavior depends on state, read the state inside its handlers.
 
-## 3. No special elements (`window` / `document` / `body`)
+(Animations **are** built in. See [Transitions](/docs/transition/transitions).)
 
-There is no `<olum:window>`-style element for global listeners. Attach them in `onMount` and remove them in the cleanup:
+## 3. No `<window>` / `<document>` / `<body>` elements
+
+To listen to global events, add the listener in `onMount` and remove it in the cleanup:
 
 ```html title="Component.html"
 <script>
@@ -52,11 +51,11 @@ There is no `<olum:window>`-style element for global listeners. Attach them in `
 </script>
 ```
 
-The same pattern covers `document` events (`selectionchange`, …).
+Same for `document` events like `selectionchange`.
 
-## 4. No dynamic component element
+## 4. No dynamic component tag
 
-There is no `<component is="…">` equivalent. Switch over the known component set with an `if` / `else-if` chain driven by a plain string in state:
+There's no `<component is="…">`. Use `<if>` / `<else-if>` with a value in state:
 
 ```html title="Component.html"
 <script>
@@ -72,15 +71,15 @@ There is no `<component is="…">` equivalent. Switch over the known component s
 <else><BlueThing /></else>
 ```
 
-## 5. Function props travel by name
+## 5. Function props must be a name
 
-A component's props are handed over as data, so a function prop only arrives when its value is a plain **name** the compiler can resolve — a top-level function of the parent, or a name destructured from `props()`. An inline arrow, a member expression (`obj.fn`) or a call is silently not a function on the child side:
+On your own components, a function prop only works when it's a plain **name** (a function in the parent's `<script>`, or one from `props()`). An inline arrow, `obj.fn`, or a call doesn't arrive as a function:
 
 ```html title="Parent.html"
-<!-- <Input/> = a component YOU wrote (any PascalCase name), not the HTML <input/> element -->
+<!-- <Input/> = YOUR component, not the HTML <input/> -->
 <Input oninput="{handleInput}" />              <!-- ✓ -->
-<Input oninput="(e) => state.text = e" />      <!-- ✗ arrives as a string -->
+<Input oninput="(e) => state.text = e" />      <!-- ✗ arrives as text -->
 <Input oninput="{(e) => state.text = e}" />    <!-- ✗ arrives as undefined -->
 ```
 
-Plain elements are not affected — inline code in `on*` is the normal way to write them ([Events](/docs/events)). To pre-bind data, pass it as its own prop and let the child call the handler with it ([Components & Props](/docs/components)).
+Normal HTML tags aren't affected: inline code in `on*` is fine there ([Events](/docs/events)). To pass extra data, send it as its own prop and let the child pass it back ([Components & Props](/docs/components#function-props)).

@@ -1,19 +1,22 @@
 ---
 title: Show / Hide
 group: Template Syntax
-order: 70
+order: 90
 ---
 
-Like `<if>`, but keeps the content in the DOM and only toggles its visibility.
+Like `<if>`, but the content **stays on the page** and is only hidden:
 
 ```html title="Component.html"
 <show when="state.visible">
-  <div class="panel">Always in the DOM; only visibility toggles.</div>
+  <div class="panel">Always on the page; only hidden or shown.</div>
 </show>
 ```
 
-`<show>` compiles to **one stable wrapper** — `<div data-o-show>` — whose `display` flips between `contents` (visible: the wrapper generates no layout box, so children lay out as if it weren't there) and `none` (hidden). Because the structure is identical in both states, toggling only rewrites that one style — the content nodes are never replaced, so a playing `<video>`, a running animation, or text typed into an input all survive hide/show.
+Because nothing is removed, a playing `<video>`, a running animation, or text typed in an input all survive being hidden and shown again.
+
+**How it works:** `<show>` becomes a `<div data-o-show>` wrapper. When visible it has `display: contents` (it takes no space, so the children look as if it weren't there). When hidden it has `display: none`.
 
 :::note
-The wrapper is present in **both** states, so CSS with direct-child combinators through it (`.parent > .panel`) won't match — target `[data-o-show] > .panel` or drop the `>`. And since a `<div>` is invalid inside `<table>`/`<select>` structures, don't wrap table rows or options in `<show>` — use [`<if>`](/docs/conditionals) or a style binding there instead.
+- The wrapper is always there, so a CSS rule like `.parent > .panel` won't match. Use `[data-o-show] > .panel` or remove the `>`.
+- A `<div>` isn't allowed inside `<table>` or `<select>`, so don't use `<show>` around table rows or options. Use [`<if>`](/docs/conditionals) or a `style` attribute there instead.
 :::

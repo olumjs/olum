@@ -1,38 +1,42 @@
 ---
 title: Quick Reference
 group: Advanced
-order: 230
+order: 290
 ---
 
-A condensed cheat-sheet covering all template syntax at a glance.
+All of Olum's template syntax on one page: text, attributes, events, forms, conditionals, loops, components, transitions and page metadata.
+
+:::tip[The one rule to remember]
+Is the attribute **code** or **text**? HTML already tells you: `onclick=""` is code, `class=""` is text. Code attributes (`when`, `each`, `key`, `on*`, `html`) take JavaScript directly in `""`. Everything else is text, with `{}` for the parts that change. No bare braces, no `:` bindings, no special directives.
+:::
 
 ```html title="cheatsheet.html"
-<!-- TEXT (auto-escaped) -->
+<!-- TEXT (escaped, safe) -->
 {state.value}
 {a > b ? 'x' : 'y'}
 
-<!-- RAW / UNESCAPED HTML (opt out of escaping) -->
+<!-- RAW HTML (trusted content only) -->
 <div html="state.articleHtml"></div>
 {olum.html(state.snippetHtml)}
 
-<!-- STRING ATTRIBUTES (literal + {expr}) -->
+<!-- ATTRIBUTES (text + {expr}) -->
 <div class="box {state.cls}" style="color:{state.color}" title="Hi {state.name}"></div>
 
-<!-- BOOLEAN ATTRIBUTES (whole-value {expr} → presence toggle) -->
+<!-- BOOLEAN ATTRIBUTES (only {expr} → added when truthy, removed when falsy) -->
 <button disabled="{state.busy}">Save</button>
 <details open="{state.expanded}">…</details>
 
-<!-- ASSET URLS (root-absolute, served from public/) -->
+<!-- FILE URLS (start with /, files live in public/) -->
 <img src="/assets/logo.svg" />
 
-<!-- EVENTS (code in "") — PLAIN ELEMENTS ONLY; on a component tag on* is a prop, see FUNCTION PROPS -->
+<!-- EVENTS (code in "") — HTML tags only; on a component, on* is a prop (see FUNCTION PROPS) -->
 <button onclick="save()">Save</button>
 <input oninput="(e)=> state.text = e.target.value" />
 <input oninput="setValue($event)" />
 <form onsubmit="(e)=> { e.preventDefault(); submit() }"></form>
-<input oninput="draft($event)" onblur="save()" />   <!-- several on* attributes on one element are fine -->
+<input oninput="draft($event)" onblur="save()" />   <!-- several on* on one element are fine -->
 
-<!-- FORM BINDINGS (manual two-way) -->
+<!-- FORM BINDING (by hand: read with value/checked/selected, write with an event) -->
 <input value="{state.text}" oninput="(e)=> state.text = e.target.value" />
 <input type="number" value="{state.n}" oninput="(e)=> state.n = +e.target.value" />
 <input type="checkbox" checked="{state.on}" onchange="(e)=> state.on = e.target.checked" />
@@ -42,45 +46,46 @@ A condensed cheat-sheet covering all template syntax at a glance.
 </select>
 <select multiple onchange="(e)=> state.picked = Array.from(e.target.options).filter(o=>o.selected).map(o=>o.value)">…</select>
 <input type="file" multiple onchange="(e)=> state.files = e.target.files" />   <!-- FileList → Array.from() to loop -->
-<input type="date" value="{state.date}" oninput="(e)=> state.date = e.target.value" />  <!-- value is a STRING -->
+<input type="date" value="{state.date}" oninput="(e)=> state.date = e.target.value" />  <!-- value is TEXT, not a Date -->
 <textarea value="{state.text}" oninput="(e)=> state.text = e.target.value"></textarea>
 <div contenteditable="true" oninput="(e)=> state.title = e.target.textContent">{state.title}</div>
 
-<!-- FORM: validation + submit + FormData (see /docs/forms) -->
+<!-- FORMS: validation + submit + FormData (see /docs/forms) -->
 <form onsubmit="(e)=> { e.preventDefault(); state.data = Object.fromEntries(new FormData(e.target)) }" onreset="reset()">
   <input name="user" value="{state.user}" oninput="set($event)" oninvalid="(e)=> { e.preventDefault(); state.err = e.target.validationMessage }" required minlength="3" />
-  <fieldset disabled="{!state.ship}">…</fieldset>   <!-- disables every control inside -->
-  <button type="submit" value="publish">Publish</button>   <!-- e.submitter tells you which -->
+  <fieldset disabled="{!state.ship}">…</fieldset>   <!-- disables every field inside -->
+  <button type="submit" value="publish">Publish</button>   <!-- e.submitter tells you which button -->
 </form>
 
-<!-- CONDITIONALS -->
+<!-- CONDITIONALS (removed from the page when false) -->
 <if when="state.tab === 'a'">…</if>
 <else-if when="state.tab === 'b'">…</else-if>
 <else>…</else>
 
-<!-- SHOW -->
+<!-- SHOW (stays on the page, only hidden) -->
 <show when="state.visible">…</show>
-
-<!-- DEBUG -->
-<log>{state.user}</log>          <!-- console.log(state.user) on mount + each time user changes; renders nothing -->
-
-<!-- TRANSITIONS (enter/leave animation; works on <if>/<show> toggles AND keyed <for> items) -->
-<if when="state.visible">
-  <transition transition="fade">              <!-- same in+out; built-ins: fade/fly/scale/slide/draw -->
-    <p>fades in and out</p>
-  </transition>
-</if>
-<transition in="fly({ y: 200 })" out="fade"><p>…</p></transition>  <!-- separate in/out + params -->
-<transition flip="{ duration: 300 }"><li>…</li></transition>       <!-- animate to new spot on keyed reorder -->
-<!-- crossfade: const _cf = crossfade({ fallback: transitions.scale }); const send=(n,p)=>_cf[0](n,p); receive=… -->
-<transition in="receive({ key: id })" out="send({ key: id })" flip><li>…</li></transition>  <!-- fly between two keyed lists -->
 
 <!-- LOOPS -->
 <for each="item of state.items" key="item.id"><Row item="{item}" /></for>
-<for each="i of 6">{i}</for>
+<for each="i of 6">{i}</for>                                <!-- 1 → 6 -->
 <for each="key in state.map">{key}</for>
 <for each="(item, index, arr) of state.items">{index}: {item}</for>
 <for each="(key, index, value) in state.map">{key} = {value}</for>
+
+<!-- DEBUG -->
+<log>{state.user}</log>          <!-- console.log when it first appears + each time user changes; shows nothing -->
+
+<!-- TRANSITIONS (needs olum-transition; works on <if>/<show> and keyed <for> items) -->
+<if when="state.visible">
+  <transition transition="fade">              <!-- same in + out; built-ins: fade/fly/scale/slide/draw -->
+    <p>fades in and out</p>
+  </transition>
+</if>
+<transition in="fly({ y: 200 })" out="fade"><p>…</p></transition>  <!-- different in/out + params -->
+<transition flip="{ duration: 300 }"><li>…</li></transition>       <!-- slide to new spot when a keyed list reorders -->
+<transition in="receive({ key: id })" out="send({ key: id })" flip><li>…</li></transition>  <!-- crossfade between two keyed lists -->
+<!--   in <script>: const _cf = crossfade({ fallback: transitions.scale });
+                    const send = (n, p) => _cf[0](n, p);  const receive = (n, p) => _cf[1](n, p); -->
 
 <!-- COMPONENTS + PROPS + SLOT -->
 <Card title="Hi" count="{n + 1}" data="{state.obj}">
@@ -88,23 +93,23 @@ A condensed cheat-sheet covering all template syntax at a glance.
 </Card>
 
 <!-- PROPS (in the child's <script>) -->
-const { title, children } = props();  // destructured names stay LIVE (compiled to fresh reads)
-const { size = "md" } = props();      // default value when the parent omits it
-{title} {children}                    // use the names anywhere — always the LATEST values
-{props().title}                       // equivalent direct read
+const { title, children } = props();  // always up to date
+const { size = "md" } = props();      // default when the parent doesn't pass it
+{title} {children}                    // use the names anywhere
+{props().title}                       // same thing
 
-<!-- FUNCTION PROPS (component events: PascalCase tag = your component, lowercase = real HTML) -->
-<!-- a NAME only, never inline code -->
+<!-- FUNCTION PROPS (PascalCase tag = your component, lowercase = real HTML) -->
+<!-- pass a NAME only, never inline code -->
 <Inner onMessage="{handleMessage}" />  <!-- child: const { onMessage } = props(); onMessage(payload) -->
-<Inner onMessage="(e)=> …" />          <!-- ✗ arrives as a plain string -->
+<Inner onMessage="(e)=> …" />          <!-- ✗ arrives as text -->
 <Inner onMessage="{(e)=> …}" />        <!-- ✗ inline fn / obj.fn / fn(arg) → arrives undefined -->
-<Row row="{row}" onPick="{pick}" />    <!-- pre-bind data by passing it, child calls onPick(row.id) -->
+<Row row="{row}" onPick="{pick}" />    <!-- pass the data; the child calls onPick(row.id) -->
 
 <!-- DERIVED VALUES (plain functions) -->
 const doubled = () => state.count * 2;
 {doubled()}
 
-<!-- host: this component's root element, inside onMount -->
+<!-- host: this component's own element (in onMount / handlers, not at the top of <script>) -->
 onMount(() => { host.querySelector("main"); });
 
 <!-- MOUNT / UNMOUNT (embedding in React / Vue — UNDER MAINTENANCE, may change) -->
@@ -114,18 +119,14 @@ app.destroy();                 // runs every cleanup, restores <head>, empties t
 
 <!-- PAGE METADATA (page.html / not-found.html ONLY — ignored elsewhere, with a warning) -->
 <head>
-  <title>{post.title} — My Blog</title>                       <!-- {expr} reads the <script> scope -->
+  <title>{post.title} — My Blog</title>                       <!-- {expr} reads the <script> -->
   <meta name="description" content="{post.excerpt}" />        <!-- escaped, like the template -->
   <link rel="canonical" href="https://ex.com/blog/{slug}" />
-  <meta property="og:image" content="{post.cover}" />         <!-- same name/property = same slot -->
+  <meta property="og:image" content="{post.cover}" />         <!-- same name/property = replaces the shell's tag -->
   <script type="application/ld+json">
-    { "@type": "Article", "headline": "{post.title}" }        <!-- bare { = JSON; {expr} only INSIDE "…", inserted raw -->
+    { "@type": "Article", "headline": "{post.title}" }        <!-- plain { = JSON; {expr} only INSIDE "…", inserted raw -->
   </script>
 </head>
-<!-- merges over public/index.html: same slot replaces in place, new tags append -->
-<!-- re-renders with the page (follows state); every route mount restores the baseline first, so nothing leaks -->
+<!-- merged into public/index.html: same kind of tag replaces in place, new tags are added -->
+<!-- updates with the page; each route change resets to public/index.html first, so nothing leaks -->
 ```
-
-:::tip[The design principle]
-OlumJS draws one line: **is the attribute fundamentally code or a string?** Native HTML already answers it (`onclick=""` is code, `class=""` is a string). Code-shaped attributes (`when` / `each` / `key` / `on*` / `html`) take an expression directly in `""`; everything else is a literal string with `{}` for the dynamic bits. No naked braces, no colon-bindings, no special directives to memorize.
-:::

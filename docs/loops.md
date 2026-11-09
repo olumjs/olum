@@ -1,10 +1,10 @@
 ---
 title: Loops
 group: Template Syntax
-order: 80
+order: 100
 ---
 
-`each` is a JS expression. Three forms — array, numeric range, object keys:
+Repeat HTML with `<for>`. `each` takes a JavaScript expression (no `{ }` needed). There are three forms:
 
 ```html title="Component.html"
 <!-- array: "item of list" -->
@@ -12,7 +12,7 @@ order: 80
   <li>{fruit.name}</li>
 </for>
 
-<!-- numeric range: "i of N"  (i goes 1 → N, not 0-based) -->
+<!-- count: "i of N" (i goes 1 → N, not from 0) -->
 <for each="i of 6">
   <span>Step {i}</span>
 </for>
@@ -23,9 +23,9 @@ order: 80
 </for>
 ```
 
-## Index and array — `(item, index, arr)`
+## Getting the index
 
-Wrap the loop params in parentheses to also receive the **index** (0-based) and the **array itself** — same signature as `Array.prototype.map`:
+Use parentheses to also get the **index** (from 0) and the **array**, like `Array.map`:
 
 ```html title="Component.html"
 <for each="(cat, index, arr) of state.cats">
@@ -33,9 +33,9 @@ Wrap the loop params in parentheses to also receive the **index** (0-based) and 
 </for>
 ```
 
-Extra params are optional — `(cat, index)` works too.
+The extra names are optional: `(cat, index)` works too.
 
-The `in` (object) form takes `(key, index, value)`, where `value` is a shortcut for `obj[key]`:
+For objects, you get `(key, index, value)`, where `value` is `obj[key]`:
 
 ```html title="Component.html"
 <for each="(key, index, value) in state.settings">
@@ -43,40 +43,40 @@ The `in` (object) form takes `(key, index, value)`, where `value` is a shortcut 
 </for>
 ```
 
-:::note
-In the numeric-range form (`i of 6`) only the first param is meaningful — `i` already counts 1 → N.
-:::
+In the count form (`i of 6`) only the first name is useful, since `i` already counts 1 → 6.
 
-## Keyed loops — `key`
+## Keys: add one when items can move
 
-Add `key` to the `<for>` so each item is matched across reorders/insertions/removals **by identity, not by position**. Without it, deleting or reordering an item makes the runtime reuse each DOM node in place and repaint it with a neighbour's data — so anything a node "owns" (a checkbox/checkmark state, a playing video, typed-in text) appears to jump to the wrong row. With `key`, nodes are **moved** and left untouched instead.
+Add `key` so Olum knows which item is which when the list is reordered, or items are added or removed.
 
-`key` is a plain JS expression (no braces, like `each`) that must be unique per item:
+**Without a key**, deleting or moving an item makes Olum reuse rows by position and fill them with a neighbour's data. Anything a row "owns" (a checked box, a playing video, typed text) seems to jump to the wrong row. **With a key**, rows are moved instead.
+
+`key` is a JavaScript expression (no `{ }`) that must be unique per item:
 
 ```html title="Component.html"
-<!-- component loop: each instance's state + DOM follows its item -->
+<!-- with components: each one keeps its own state -->
 <for each="todo of state.todos" key="todo.id">
   <TodoRow todo="{todo}" />
 </for>
 
-<!-- plain-element loop: the repeated <li> is reconciled by identity -->
+<!-- with plain elements -->
 <for each="todo of state.todos" key="todo.id">
   <li data-done="{todo.done}">{todo.text}</li>
 </for>
 ```
 
 :::note
-`key` on `<for>` keys **both** component loops (the component instance is reused) and plain-element loops (the repeated root element is reused). It's applied to each loop's **direct root** only — inner children are never keyed. You can also put `key="{item.id}"` (with braces) directly on a plain element if you prefer; the `<for>` form is just the same thing applied for you.
+The key goes on the element directly inside `<for>` only, not on deeper children. You can also write `key="{item.id}"` (with braces) on a plain element yourself; the `<for>` form just does it for you.
 :::
 
-## The numeric range needs a literal number
+## The count must be a written number
 
-`each="i of 6"` compiles to a range **only when the count is written as a literal number**. A dynamic count isn't detected — build the range from it instead:
+`each="i of 6"` only works when the number is written right there. A number from state won't work. Build an array instead:
 
 ```html title="Component.html"
-<!-- ✗ breaks at runtime: state.n is a number, not an array -->
+<!-- ✗ breaks: state.n is a number, not an array -->
 <for each="i of state.n">…</for>
 
-<!-- ✓ range built from the dynamic count (i goes 1 → n) -->
+<!-- ✓ i goes 1 → n -->
 <for each="i of Array.from({ length: state.n }, (_, k) => k + 1)">…</for>
 ```

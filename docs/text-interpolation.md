@@ -4,7 +4,7 @@ group: Reactivity
 order: 40
 ---
 
-Any `{expr}` in **text** is evaluated as JavaScript and **HTML-escaped by default** (XSS-safe).
+Show a JavaScript value in your HTML by wrapping it in `{ }`. It's always shown as safe text:
 
 ```html title="Component.html"
 <p>Hello {state.user.name}</p>
@@ -12,6 +12,8 @@ Any `{expr}` in **text** is evaluated as JavaScript and **HTML-escaped by defaul
 <p>{state.count > 0 ? 'positive' : 'zero'}</p>
 ```
 
-- `null` / `undefined` render as an empty string.
-- To render unescaped HTML, see [Raw HTML](/docs/raw-html).
-- There is **no escape for a literal `{`** in text — any `{…}` is treated as interpolation. Use `{String.fromCharCode(123)}` or a `const` holding `"{"`.
+## Good to know
+
+- The value is **HTML-escaped**, so text like `<b>` shows as text, not as HTML. This keeps you safe from XSS. To show real HTML, see [Raw HTML](/docs/raw-html).
+- `null` and `undefined` show as nothing.
+- There is **no way to escape `{`** in text. Any `{…}` is treated as code. To show a literal `{`, write `{String.fromCharCode(123)}` or put `"{"` in a `const` and show that.
