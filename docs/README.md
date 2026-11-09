@@ -89,6 +89,23 @@ Write for a beginner who knows HTML, CSS and a little JavaScript:
 - Short sentences and everyday words ("the page updates", not "a re-render is scheduled").
 - Show ✓ / ✗ examples for common mistakes.
 
+## Translations
+
+Each page can have translations next to it: `state.zh-cn.md`, `state.ja.md`, `state.es.md`, `state.pt-br.md`. The plain `state.md` is English and is the source.
+
+A translation keeps the English page's shape so the two can be compared:
+
+- **Frontmatter:** translate `title` and `group`, keep `order`. `source:` is the English file's hash at the time of translating (added by the script).
+- **Code blocks stay byte-for-byte English**, comments included.
+- **Same headings, same order, same levels.** Each ends with `{#id}`, the English heading's anchor, so `/docs/state#some-heading` works in every language. The script adds these.
+- **Links and URLs stay as they are.** Translate only the link text.
+
+Commands:
+
+- `npm run docs:i18n` lists missing and outdated translations, and fails if an up-to-date one doesn't match its English page.
+- `npm run docs:i18n:fix` adds the `{#id}` anchors and stamps `source:` on new translations.
+- After updating a translation for a changed English page: `node scripts/docs-i18n.js --bless docs/olum/state.ja.md` to mark it current.
+
 ## After editing
 
-`llms.txt` is a hand-written summary of these docs. Update it to match, then run `npm run llms:bless` (`npm run llms:check` fails until you do).
+`llms.txt` is a hand-written summary of these docs. Update it to match, then run `npm run llms:bless` (`npm run llms:check` fails until you do). It summarizes the English pages only; translations don't affect it.
