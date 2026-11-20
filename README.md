@@ -86,3 +86,6 @@ Questions or unsure about an idea? Ask in [Discord](https://discord.gg/2zK7tb2Cg
 ## Contact
 - General: [hello@olumjs.top](mailto:hello@olumjs.top)
 - Security: [security@olumjs.top](mailto:security@olumjs.top) — please report vulnerabilities here privately rather than opening a public issue
+
+## Author
+Created by [Eissa Saber](https://www.eissa.top).
