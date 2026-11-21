@@ -64,14 +64,14 @@ const pageSize = Number(process.env.PAGE_SIZE);  // ✓  "20" → 20
 ## 这里的一切都是公开的 {#everything-here-is-public}
 
 :::danger[绝不要在这些文件里放密钥]
-这些值**会被包含在构建产物中**：它们被写进 `dist/index.html` 和打包后的 JS，每个访客的浏览器都会下载它们，任何人都能读到。地址和功能开关没问题。**关键凭据**（私密的 API 密钥、数据库密码、私有令牌）必须放在**单独的后端**：你的应用调用那个后端，只有后端使用密钥。
+这些值**会被包含在构建产物中**：它们被写进打包后的 JS，每个访客的浏览器都会下载它们，任何人都能读到。地址和功能开关没问题。**关键凭据**（私密的 API 密钥、数据库密码、私有令牌）必须放在**单独的后端**：你的应用调用那个后端，只有后端使用密钥。
 :::
 
 ## 工作原理 {#how-it-works}
 
-- **在 dev 中**，你的值会以一个设置 `process.env` 的小脚本加进 `index.html`，在你的任何代码运行之前执行。`public/index.html` 里的内联脚本也能读取它。
+- **在 dev 中**，你的值会写进一个设置 `process.env` 的生成小模块。`main.js` 首先导入它，所以它在你的任何代码之前运行。`public/index.html` 里的内联脚本在它之前运行，因此读取不到。
 - **在构建中**，每个完整写出的 `process.env.NAME` 都会在打包后的 JS 里被替换成它的值。永远不会成立的判断后面的代码（`DEBUG=false` 时的 `if (process.env.DEBUG === "true")`）会从包中移除。
-- `process.env[name]` 和文件里没有的名字在构建中依然可用：它们从 `dist/index.html` 里的同一个脚本读取。
+- 在构建中，`process.env[name]` 和文件里没有的名字都是 `undefined`。请把每个名字完整写出。
 
 ## 须知 {#good-to-know}
 

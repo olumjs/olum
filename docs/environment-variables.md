@@ -63,14 +63,14 @@ Use names made of letters, digits and `_` (`API_URL`, `apiUrl`).
 ## Everything here is public
 
 :::danger[Never put secrets in these files]
-These values are **included in the build**: they're written into `dist/index.html` and the bundled JS, and every visitor's browser downloads them, where anyone can read them. Addresses and feature switches are fine. **Critical credentials** (secret API keys, database passwords, private tokens) must live in a **separate backend**: your app calls that backend, and only the backend uses the secret.
+These values are **included in the build**: they're written into the bundled JS, and every visitor's browser downloads them, where anyone can read them. Addresses and feature switches are fine. **Critical credentials** (secret API keys, database passwords, private tokens) must live in a **separate backend**: your app calls that backend, and only the backend uses the secret.
 :::
 
 ## How it works
 
-- **In dev**, your values are added to `index.html` as a small script that sets `process.env`, before any of your code runs. Inline scripts in `public/index.html` can read it too.
+- **In dev**, your values go into a small generated module that sets `process.env`. `main.js` imports it first, so it runs before any of your code. Inline scripts in `public/index.html` run before it, so they can't read it.
 - **In a build**, every `process.env.NAME` you write out in full is replaced by its value in the bundled JS. Code behind a check that can never pass (`if (process.env.DEBUG === "true")` with `DEBUG=false`) is dropped from the bundle.
-- `process.env[name]` and names that aren't in the file still work in a build: they're read from the same script in `dist/index.html`.
+- In a build, `process.env[name]` and names that aren't in the file are `undefined`. Write each name out in full.
 
 ## Good to know
 

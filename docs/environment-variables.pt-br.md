@@ -64,14 +64,14 @@ Use nomes feitos de letras, dígitos e `_` (`API_URL`, `apiUrl`).
 ## Tudo aqui é público {#everything-here-is-public}
 
 :::danger[Nunca coloque segredos nesses arquivos]
-Esses valores são **incluídos no build**: são escritos em `dist/index.html` e no JS empacotado, e o navegador de cada visitante os baixa, onde qualquer pessoa pode lê-los. Endereços e chaves de funcionalidade tudo bem. **Credenciais críticas** (chaves secretas de API, senhas de banco de dados, tokens privados) devem ficar em um **backend separado**: seu app chama esse backend, e só o backend usa o segredo.
+Esses valores são **incluídos no build**: são escritos no JS empacotado, e o navegador de cada visitante os baixa, onde qualquer pessoa pode lê-los. Endereços e chaves de funcionalidade tudo bem. **Credenciais críticas** (chaves secretas de API, senhas de banco de dados, tokens privados) devem ficar em um **backend separado**: seu app chama esse backend, e só o backend usa o segredo.
 :::
 
 ## Como funciona {#how-it-works}
 
-- **No dev**, seus valores são adicionados ao `index.html` como um pequeno script que define `process.env`, antes de qualquer código seu rodar. Scripts inline em `public/index.html` também podem lê-lo.
+- **No dev**, seus valores vão para um pequeno módulo gerado que define `process.env`. O `main.js` o importa primeiro, então ele roda antes de qualquer código seu. Scripts inline em `public/index.html` rodam antes dele, então não conseguem lê-lo.
 - **No build**, cada `process.env.NAME` escrito por extenso é substituído pelo seu valor no JS empacotado. Código atrás de uma verificação que nunca pode passar (`if (process.env.DEBUG === "true")` com `DEBUG=false`) é removido do bundle.
-- `process.env[name]` e nomes que não estão no arquivo continuam funcionando no build: são lidos do mesmo script em `dist/index.html`.
+- No build, `process.env[name]` e nomes que não estão no arquivo são `undefined`. Escreva cada nome por extenso.
 
 ## Bom saber {#good-to-know}
 

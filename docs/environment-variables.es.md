@@ -64,14 +64,14 @@ Usa nombres hechos de letras, dígitos y `_` (`API_URL`, `apiUrl`).
 ## Todo esto es público {#everything-here-is-public}
 
 :::danger[Nunca pongas secretos en estos archivos]
-Estos valores se **incluyen en la compilación**: se escriben en `dist/index.html` y en el JS empaquetado, y el navegador de cada visitante los descarga, donde cualquiera puede leerlos. Direcciones e interruptores de funciones están bien. Las **credenciales críticas** (claves secretas de API, contraseñas de bases de datos, tokens privados) deben estar en un **backend separado**: tu app llama a ese backend, y solo el backend usa el secreto.
+Estos valores se **incluyen en la compilación**: se escriben en el JS empaquetado, y el navegador de cada visitante los descarga, donde cualquiera puede leerlos. Direcciones e interruptores de funciones están bien. Las **credenciales críticas** (claves secretas de API, contraseñas de bases de datos, tokens privados) deben estar en un **backend separado**: tu app llama a ese backend, y solo el backend usa el secreto.
 :::
 
 ## Cómo funciona {#how-it-works}
 
-- **En dev**, tus valores se añaden a `index.html` como un pequeño script que define `process.env`, antes de que se ejecute tu código. Los scripts inline de `public/index.html` también pueden leerlo.
+- **En dev**, tus valores van a un pequeño módulo generado que define `process.env`. `main.js` lo importa primero, así que se ejecuta antes que tu código. Los scripts inline de `public/index.html` se ejecutan antes que él, así que no pueden leerlo.
 - **En una compilación**, cada `process.env.NAME` que escribes completo se reemplaza por su valor en el JS empaquetado. El código detrás de una comprobación que nunca puede cumplirse (`if (process.env.DEBUG === "true")` con `DEBUG=false`) se elimina del bundle.
-- `process.env[name]` y los nombres que no están en el archivo siguen funcionando en una compilación: se leen del mismo script en `dist/index.html`.
+- En una compilación, `process.env[name]` y los nombres que no están en el archivo son `undefined`. Escribe cada nombre completo.
 
 ## Bueno saber {#good-to-know}
 
